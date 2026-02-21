@@ -1,35 +1,40 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace Sh8lny.Domain.Models
+﻿namespace Sh8lny.Domain.Models
 {
+    /// <summary>
+    /// Represents a daily snapshot of platform-wide dashboard statistics.
+    /// Used for historical trend analysis in the admin dashboard.
+    /// </summary>
     public class DashboardMetric
     {
         // Primary key
         public int MetricID { get; set; }
 
-        // Foreign keys
-        //public int? CompanyID { get; set; }
-        //public int? UniversityID { get; set; }
-
-        // Metrics
+        // User Statistics
         public int TotalStudents { get; set; }
-        public int TotalProjects { get; set; }
-        public int CompletedProjects { get; set; }
-        public int AvailableOpportunities { get; set; }
-        public int NewApplicants { get; set; }
-        //public int ProjectsNearDeadline { get; set; }
-        public decimal ActivityIncreasePercent { get; set; }
+        public int TotalCompanies { get; set; }
+        public int TotalUsers { get; set; }
+        public int ActiveUsers { get; set; }
+        public int BannedUsers { get; set; }
 
-        // Timestamps
+        // Project Statistics
+        public int TotalProjects { get; set; }
+        public int ActiveProjects { get; set; }
+        public int ClosedProjects { get; set; }
+
+        // Application Statistics
+        public int TotalApplications { get; set; }
+        public int CompletedApplications { get; set; }
+
+        // Financial Statistics
+        public decimal TotalTransactionVolume { get; set; }
+        public int TotalTransactions { get; set; }
+
+        // Recent Activity
+        public int NewUsersLast30Days { get; set; }
+        public int NewProjectsLast30Days { get; set; }
+
+        // Snapshot Timestamps
         public DateTime MetricDate { get; set; }
         public DateTime CreatedAt { get; set; }
-
-        // Navigation properties
-        // public Company? Company { get; set; }
-        //public University? University { get; set; }
     }
 }

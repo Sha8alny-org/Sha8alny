@@ -72,6 +72,16 @@ public class AdminService : IAdminService
                 NewProjectsLast30Days = newProjectsLast30Days
             };
 
+            // Silently record today's snapshot for historical tracking
+            try
+            {
+                await SaveSnapshotIfNeededAsync(stats);
+            }
+            catch
+            {
+                // Snapshot recording failure should not affect the live stats response
+            }
+
             return ServiceResponse<AdminDashboardStatsDto>.Success(stats);
         }
         catch (Exception ex)
@@ -302,5 +312,141 @@ public class AdminService : IAdminService
 
         // Fallback
         return (user.Email, null);
+    }
+
+    /// <inheritdoc />
+    public async Task<ServiceResponse<IEnumerable<DashboardMetricHistoryDto>>> GetMetricHistoryAsync(int days = 30)
+    {
+        try
+        {
+            var since = DateTime.UtcNow.Date.AddDays(-days);
+            var metrics = await _unitOfWork.DashboardMetrics.FindAsync(m => m.MetricDate >= since);
+
+            var history = metrics
+                .OrderBy(m => m.MetricDate)
+                .Select(m => new DashboardMetricHistoryDto
+                {
+                    MetricDate = m.MetricDate,
+                    TotalStudents = m.TotalStudents,
+                    TotalCompanies = m.TotalCompanies,
+                    TotalUsers = m.TotalUsers,
+                    ActiveUsers = m.ActiveUsers,
+                    BannedUsers = m.BannedUsers,
+                    TotalProjects = m.TotalProjects,
+                    ActiveProjects = m.ActiveProjects,
+                    ClosedProjects = m.ClosedProjects,
+                    TotalApplications = m.TotalApplications,
+                    CompletedApplications = m.CompletedApplications,
+                    TotalTransactionVolume = m.TotalTransactionVolume,
+                    TotalTransactions = m.TotalTransactions,
+                    NewUsersLast30Days = m.NewUsersLast30Days,
+                    NewProjectsLast30Days = m.NewProjectsLast30Days
+                });
+
+            return ServiceResponse<IEnumerable<DashboardMetricHistoryDto>>.Success(history);
+        }
+        catch (Exception ex)
+        {
+            return ServiceResponse<IEnumerable<DashboardMetricHistoryDto>>.Failure(
+                "An error occurred while retrieving metric history.",
+                new List<string> { ex.Message });
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task<ServiceResponse<bool>> RecordDailySnapshotAsync()
+    {
+        try
+        {
+            var today = DateTime.UtcNow.Date;
+
+            // Check if a snapshot for today already exists
+            var existingSnapshot = await _unitOfWork.DashboardMetrics
+                .FindSingleAsync(m => m.MetricDate == today);
+
+            if (existingSnapshot is not null)
+            {
+                return ServiceResponse<bool>.Success(true, "Snapshot for today already exists.");
+            }
+
+            // Compute current stats
+            var thirtyDaysAgo = DateTime.UtcNow.AddDays(-30);
+
+            var transactions = await _unitOfWork.Transactions.GetAllAsync();
+            var transactionList = transactions.ToList();
+
+            var snapshot = new DashboardMetric
+            {
+                TotalStudents = await _unitOfWork.Students.CountAsync(),
+                TotalCompanies = await _unitOfWork.Companies.CountAsync(),
+                TotalUsers = await _unitOfWork.Users.CountAsync(),
+                ActiveUsers = await _unitOfWork.Users.CountAsync(u => u.IsActive),
+                BannedUsers = await _unitOfWork.Users.CountAsync(u => !u.IsActive),
+                TotalProjects = await _unitOfWork.Projects.CountAsync(),
+                ActiveProjects = await _unitOfWork.Projects.CountAsync(p =>
+                    p.Status == ProjectStatus.Active || p.Status == ProjectStatus.Pending),
+                ClosedProjects = await _unitOfWork.Projects.CountAsync(p =>
+                    p.Status == ProjectStatus.Closed || p.Status == ProjectStatus.Complete),
+                TotalApplications = await _unitOfWork.Applications.CountAsync(),
+                CompletedApplications = await _unitOfWork.Applications.CountAsync(a =>
+                    a.Status == ApplicationStatus.Completed),
+                TotalTransactionVolume = transactionList
+                    .Where(t => t.Status == TransactionStatus.Completed)
+                    .Sum(t => t.Amount),
+                TotalTransactions = transactionList.Count,
+                NewUsersLast30Days = await _unitOfWork.Users.CountAsync(u => u.CreatedAt >= thirtyDaysAgo),
+                NewProjectsLast30Days = await _unitOfWork.Projects.CountAsync(p => p.CreatedAt >= thirtyDaysAgo),
+                MetricDate = today,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            await _unitOfWork.DashboardMetrics.AddAsync(snapshot);
+            await _unitOfWork.SaveAsync();
+
+            return ServiceResponse<bool>.Success(true, "Daily snapshot recorded successfully.");
+        }
+        catch (Exception ex)
+        {
+            return ServiceResponse<bool>.Failure(
+                "An error occurred while recording the daily snapshot.",
+                new List<string> { ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Saves a dashboard snapshot for today if one doesn't already exist.
+    /// Reuses pre-computed stats from GetDashboardStatsAsync to avoid redundant queries.
+    /// </summary>
+    private async Task SaveSnapshotIfNeededAsync(AdminDashboardStatsDto stats)
+    {
+        var today = DateTime.UtcNow.Date;
+
+        var exists = await _unitOfWork.DashboardMetrics
+            .AnyAsync(m => m.MetricDate == today);
+
+        if (exists) return;
+
+        var snapshot = new DashboardMetric
+        {
+            TotalStudents = stats.TotalStudents,
+            TotalCompanies = stats.TotalCompanies,
+            TotalUsers = stats.TotalUsers,
+            ActiveUsers = stats.ActiveUsers,
+            BannedUsers = stats.BannedUsers,
+            TotalProjects = stats.TotalProjects,
+            ActiveProjects = stats.ActiveProjects,
+            ClosedProjects = stats.ClosedProjects,
+            TotalApplications = stats.TotalApplications,
+            CompletedApplications = stats.CompletedApplications,
+            TotalTransactionVolume = stats.TotalTransactionVolume,
+            TotalTransactions = stats.TotalTransactions,
+            NewUsersLast30Days = stats.NewUsersLast30Days,
+            NewProjectsLast30Days = stats.NewProjectsLast30Days,
+            MetricDate = today,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        await _unitOfWork.DashboardMetrics.AddAsync(snapshot);
+        await _unitOfWork.SaveAsync();
     }
 }

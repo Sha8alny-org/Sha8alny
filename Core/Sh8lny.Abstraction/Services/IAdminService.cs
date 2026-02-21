@@ -46,4 +46,18 @@ public interface IAdminService
     /// <param name="userId">The user ID.</param>
     /// <returns>Service response containing user details.</returns>
     Task<ServiceResponse<UserManagementDto>> GetUserByIdAsync(int userId);
+
+    /// <summary>
+    /// Gets historical dashboard metric snapshots for trend analysis.
+    /// </summary>
+    /// <param name="days">Number of days of history to retrieve (default 30).</param>
+    /// <returns>Service response containing list of metric snapshots ordered by date.</returns>
+    Task<ServiceResponse<IEnumerable<DashboardMetricHistoryDto>>> GetMetricHistoryAsync(int days = 30);
+
+    /// <summary>
+    /// Records a daily snapshot of current dashboard metrics.
+    /// Skips recording if a snapshot for today already exists.
+    /// </summary>
+    /// <returns>Service response indicating success or failure.</returns>
+    Task<ServiceResponse<bool>> RecordDailySnapshotAsync();
 }

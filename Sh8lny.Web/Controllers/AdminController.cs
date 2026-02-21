@@ -127,4 +127,40 @@ public class AdminController : ControllerBase
 
         return Ok(result);
     }
+
+    /// <summary>
+    /// Gets historical dashboard metric snapshots for trend analysis.
+    /// </summary>
+    /// <param name="days">Number of days of history to retrieve (default 30).</param>
+    /// <returns>List of metric snapshots ordered by date.</returns>
+    [HttpGet("metrics/history")]
+    public async Task<ActionResult<ServiceResponse<IEnumerable<DashboardMetricHistoryDto>>>> GetMetricHistory([FromQuery] int days = 30)
+    {
+        var result = await _adminService.GetMetricHistoryAsync(days);
+
+        if (!result.IsSuccess)
+        {
+            return BadRequest(result);
+        }
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Manually records a daily snapshot of current dashboard metrics.
+    /// Idempotent — skips if today's snapshot already exists.
+    /// </summary>
+    /// <returns>Success or failure response.</returns>
+    [HttpPost("metrics/snapshot")]
+    public async Task<ActionResult<ServiceResponse<bool>>> RecordDailySnapshot()
+    {
+        var result = await _adminService.RecordDailySnapshotAsync();
+
+        if (!result.IsSuccess)
+        {
+            return BadRequest(result);
+        }
+
+        return Ok(result);
+    }
 }
