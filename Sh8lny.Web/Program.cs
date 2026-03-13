@@ -23,9 +23,19 @@ namespace Sh8lny.Web
             var builder = WebApplication.CreateBuilder(args);
 
             // Add services to the container.
-
             builder.Services.AddControllers();
-            
+
+            builder.Services.AddCors(options =>
+            {
+                options.AddPolicy("AllowAll", builder =>
+                {
+                    builder.SetIsOriginAllowed(_ => true) 
+                           .AllowAnyMethod()
+                           .AllowAnyHeader()
+                           .AllowCredentials(); 
+                });
+            });
+
             // Swagger/OpenAPI - using Swashbuckle
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen(options =>
@@ -125,7 +135,7 @@ namespace Sh8lny.Web
             });
 
             builder.Services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
-            
+
             builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 
             // Application Services
@@ -160,13 +170,13 @@ namespace Sh8lny.Web
             {
                 var context = scope.ServiceProvider.GetRequiredService<Sha8lnyDbContext>();
                 var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-                
+
                 try
                 {
                     logger.LogInformation("Applying database migrations...");
                     await context.Database.MigrateAsync();
                     logger.LogInformation("Database migrations applied successfully.");
-                    
+
                     logger.LogInformation("Seeding database...");
                     await DbInitializer.SeedAsync(context);
                     logger.LogInformation("Database seeding completed.");
@@ -178,21 +188,19 @@ namespace Sh8lny.Web
                 }
             }
 
-            // Configure the HTTP request pipeline.
-            if (app.Environment.IsDevelopment())
+            app.UseSwagger();
+            app.UseSwaggerUI(options =>
             {
-                app.UseSwagger();
-                app.UseSwaggerUI(options =>
-                {
-                    options.SwaggerEndpoint("/swagger/v1/swagger.json", "Sha8alny API v1");
-                    options.RoutePrefix = string.Empty; // Swagger at root URL
-                });
-            }
+                options.SwaggerEndpoint("/swagger/v1/swagger.json", "Sha8alny API v1");
+                options.RoutePrefix = string.Empty; // Swagger at root URL
+            });
 
             app.UseHttpsRedirection();
 
             // Enable serving static files from wwwroot
             app.UseStaticFiles();
+
+            app.UseCors("AllowAll");
 
             app.UseAuthentication();
             app.UseAuthorization();
