@@ -11,7 +11,7 @@ namespace Sh8lny.Web.Controllers;
 /// Controller for company profile management.
 /// </summary>
 [ApiController]
-[Route("api/company")]
+[Route("api/companies")]
 [Authorize(Roles = "Company")]
 public class CompanyProfileController : ControllerBase
 {
@@ -66,6 +66,49 @@ public class CompanyProfileController : ControllerBase
         if (!result.IsSuccess)
         {
             return NotFound(result);
+        }
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Updates the company profile for the authenticated user.
+    /// </summary>
+    /// <param name="dto">The updated profile data.</param>
+    /// <returns>The updated company ID.</returns>
+    [HttpPut("profile")]
+    public async Task<ActionResult<ServiceResponse<int>>> UpdateProfile([FromBody] CompanyProfileUpdateDto dto)
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+        if (userIdClaim is null || !int.TryParse(userIdClaim.Value, out var userId))
+        {
+            return Unauthorized(ServiceResponse<int>.Failure("Invalid or missing user token."));
+        }
+
+        var result = await _companyService.UpdateCompanyProfileAsync(userId, dto);
+
+        if (!result.IsSuccess)
+        {
+            return BadRequest(result);
+        }
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Searches for companies based on the provided criteria.
+    /// </summary>
+    /// <param name="searchDto">The search criteria.</param>
+    /// <returns>A paged list of company search results.</returns>
+    [HttpGet("search")]
+    [AllowAnonymous]
+    public async Task<ActionResult<ServiceResponse<PagedResult<CompanySearchResultDto>>>> Search([FromQuery] CompanySearchDto searchDto)
+    {
+        var result = await _companyService.SearchCompaniesAsync(searchDto);
+
+        if (!result.IsSuccess)
+        {
+            return BadRequest(result);
         }
 
         return Ok(result);

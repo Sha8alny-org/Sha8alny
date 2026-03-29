@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using Sh8lny.Abstraction.Repositories;
 using Sh8lny.Abstraction.Services;
 using Sh8lny.Domain.Models;
@@ -58,6 +59,7 @@ public class StudentService : IStudentService
                 Country = dto.Country,
                 Status = StudentStatus.Active,
                 ProfileCompleteness = CalculateProfileCompleteness(dto),
+                TotalInternshipDays = dto.TotalInternshipDays,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
@@ -154,5 +156,213 @@ public class StudentService : IStudentService
         if (dto.SkillIds.Count > 0) completeness++;
 
         return (int)((completeness / (double)totalFields) * 100);
+    }
+
+    /// <inheritdoc />
+    public async Task<ServiceResponse<int>> UpdateStudentProfileAsync(int userId, StudentProfileUpdateDto dto)
+    {
+        try
+        {
+            var student = await _unitOfWork.Students.FindSingleAsync(s => s.UserID == userId);
+            if (student is null)
+            {
+                return ServiceResponse<int>.Failure("Student profile not found.");
+            }
+
+            if (!string.IsNullOrWhiteSpace(dto.FirstName))
+                student.FirstName = dto.FirstName;
+
+            if (!string.IsNullOrWhiteSpace(dto.LastName))
+                student.LastName = dto.LastName;
+
+            if (dto.Bio is not null)
+                student.Bio = dto.Bio;
+
+            if (dto.Phone is not null)
+                student.Phone = dto.Phone;
+
+            if (dto.ProfilePicture is not null)
+                student.ProfilePicture = dto.ProfilePicture;
+
+            if (dto.GitHubProfile is not null)
+                student.GitHubProfile = dto.GitHubProfile;
+
+            if (dto.UniversityID.HasValue)
+                student.UniversityID = dto.UniversityID;
+
+            if (dto.DepartmentID.HasValue)
+                student.DepartmentID = dto.DepartmentID;
+
+            if (dto.AcademicYear.HasValue)
+                student.AcademicYear = dto.AcademicYear.Value switch
+                {
+                    Shared.DTOs.StudentProfile.AcademicYearDto.FirstYear => Domain.Models.AcademicYear.FirstYear,
+                    Shared.DTOs.StudentProfile.AcademicYearDto.SecondYear => Domain.Models.AcademicYear.SecondYear,
+                    Shared.DTOs.StudentProfile.AcademicYearDto.ThirdYear => Domain.Models.AcademicYear.ThirdYear,
+                    Shared.DTOs.StudentProfile.AcademicYearDto.FourthYear => Domain.Models.AcademicYear.FourthYear,
+                    Shared.DTOs.StudentProfile.AcademicYearDto.Graduate => Domain.Models.AcademicYear.Graduate,
+                    _ => student.AcademicYear
+                };
+
+            if (dto.StudentIDNumber is not null)
+                student.StudentIDNumber = dto.StudentIDNumber;
+
+            if (dto.City is not null)
+                student.City = dto.City;
+
+            if (dto.State is not null)
+                student.State = dto.State;
+
+            if (dto.Country is not null)
+                student.Country = dto.Country;
+
+            student.UpdatedAt = DateTime.UtcNow;
+
+            _unitOfWork.Students.Update(student);
+            await _unitOfWork.SaveAsync();
+
+            return ServiceResponse<int>.Success(student.StudentID, "Student profile updated successfully.");
+        }
+        catch (Exception ex)
+        {
+            return ServiceResponse<int>.Failure("An error occurred while updating the profile.",
+                new List<string> { ex.Message });
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task<ServiceResponse<PagedResult<StudentSearchResultDto>>> SearchStudentsAsync(StudentSearchDto searchDto)
+    {
+        try
+        {
+            Expression<Func<Student, bool>>? predicate = null;
+
+            if (!string.IsNullOrWhiteSpace(searchDto.Keyword))
+            {
+                var keyword = searchDto.Keyword.ToLower();
+                predicate = s =>
+                    (s.FirstName + " " + s.LastName).ToLower().Contains(keyword) ||
+                    s.FirstName.ToLower().Contains(keyword) ||
+                    s.LastName.ToLower().Contains(keyword) ||
+                    (s.Bio != null && s.Bio.ToLower().Contains(keyword));
+            }
+
+            IEnumerable<Student> students;
+            
+            if (predicate != null)
+            {
+                students = await _unitOfWork.Students.FindAsync(predicate);
+            }
+            else
+            {
+                students = await _unitOfWork.Students.GetAllAsync();
+            }
+
+            var query = students.AsQueryable();
+
+            if (searchDto.DepartmentID.HasValue)
+            {
+                query = query.Where(s => s.DepartmentID == searchDto.DepartmentID);
+            }
+
+            if (searchDto.UniversityID.HasValue)
+            {
+                query = query.Where(s => s.UniversityID == searchDto.UniversityID);
+            }
+
+            if (!string.IsNullOrWhiteSpace(searchDto.AcademicYear))
+            {
+                query = query.Where(s => s.AcademicYear != null && s.AcademicYear.ToString() == searchDto.AcademicYear);
+            }
+
+            if (!string.IsNullOrWhiteSpace(searchDto.City))
+            {
+                query = query.Where(s => s.City != null && s.City.ToLower() == searchDto.City.ToLower());
+            }
+
+            if (!string.IsNullOrWhiteSpace(searchDto.Country))
+            {
+                query = query.Where(s => s.Country != null && s.Country.ToLower() == searchDto.Country.ToLower());
+            }
+
+            var totalCount = query.Count();
+
+            var skip = (searchDto.PageNumber - 1) * searchDto.PageSize;
+            var result = query
+                .OrderByDescending(s => s.CreatedAt)
+                .Skip(skip)
+                .Take(searchDto.PageSize)
+                .Select(s => new StudentSearchResultDto
+                {
+                    Id = s.StudentID,
+                    Name = s.FirstName + " " + s.LastName,
+                    StudyYear = s.AcademicYear != null ? s.AcademicYear.ToString() : string.Empty,
+                    JoinDate = s.CreatedAt,
+                    Department = s.Department != null ? s.Department.DepartmentName : string.Empty
+                })
+                .ToList();
+
+            var pagedResult = new PagedResult<StudentSearchResultDto>
+            {
+                Items = result,
+                TotalCount = totalCount,
+                PageNumber = searchDto.PageNumber,
+                PageSize = searchDto.PageSize
+            };
+
+            return ServiceResponse<PagedResult<StudentSearchResultDto>>.Success(pagedResult);
+        }
+        catch (Exception ex)
+        {
+            return ServiceResponse<PagedResult<StudentSearchResultDto>>.Failure("An error occurred while searching for students.",
+                new List<string> { ex.Message });
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task<ServiceResponse<StudentResponseDto>> GetProfileAsync(int userId)
+    {
+        try
+        {
+            var student = await _unitOfWork.Students.FindSingleAsync(s => s.UserID == userId);
+
+            if (student is null)
+            {
+                return ServiceResponse<StudentResponseDto>.Failure("Student profile not found.");
+            }
+
+            var studentDto = new StudentResponseDto
+            {
+                Id = student.StudentID,
+                UserId = student.UserID,
+                FirstName = student.FirstName,
+                LastName = student.LastName,
+                Bio = student.Bio,
+                Phone = student.Phone,
+                ProfilePicture = student.ProfilePicture,
+                GitHubProfile = student.GitHubProfile,
+                UniversityID = student.UniversityID,
+                DepartmentID = student.DepartmentID,
+                AcademicYear = student.AcademicYear?.ToString(),
+                StudentIDNumber = student.StudentIDNumber,
+                City = student.City,
+                State = student.State,
+                Country = student.Country,
+                ProfileCompleteness = student.ProfileCompleteness,
+                Status = student.Status.ToString(),
+                AverageRating = student.AverageRating,
+                TotalReviews = student.TotalReviews,
+                TotalInternshipDays = student.TotalInternshipDays,
+                CreatedAt = student.CreatedAt,
+                UpdatedAt = student.UpdatedAt
+            };
+
+            return ServiceResponse<StudentResponseDto>.Success(studentDto);
+        }
+        catch (Exception ex)
+        {
+            return ServiceResponse<StudentResponseDto>.Failure("An error occurred while retrieving the student profile.",
+                new List<string> { ex.Message });
+        }
     }
 }

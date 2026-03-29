@@ -41,6 +41,9 @@ namespace Sh8lny.Domain.Models
         public decimal AverageRating { get; set; }
         public int TotalReviews { get; set; }
 
+        // Internship
+        public int TotalInternshipDays { get; set; }
+
         // Timestamps
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }

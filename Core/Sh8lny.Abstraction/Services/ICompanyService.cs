@@ -22,4 +22,19 @@ public interface ICompanyService
     /// <param name="userId">The ID of the user.</param>
     /// <returns>Service response containing the company profile.</returns>
     Task<ServiceResponse<CompanyDto>> GetProfileAsync(int userId);
+
+    /// <summary>
+    /// Updates the company profile for the authenticated user.
+    /// </summary>
+    /// <param name="userId">The ID of the user updating the profile.</param>
+    /// <param name="dto">The updated profile data.</param>
+    /// <returns>Service response containing the updated company ID.</returns>
+    Task<ServiceResponse<int>> UpdateCompanyProfileAsync(int userId, CompanyProfileUpdateDto dto);
+
+    /// <summary>
+    /// Searches for companies based on the provided criteria.
+    /// </summary>
+    /// <param name="searchDto">The search criteria.</param>
+    /// <returns>Service response containing a paged list of company search results.</returns>
+    Task<ServiceResponse<PagedResult<CompanySearchResultDto>>> SearchCompaniesAsync(CompanySearchDto searchDto);
 }

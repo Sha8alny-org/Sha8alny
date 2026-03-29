@@ -11,7 +11,7 @@ namespace Sh8lny.Web.Controllers;
 /// Controller for student profile management.
 /// </summary>
 [ApiController]
-[Route("api/student")]
+[Route("api/students")]
 [Authorize]
 public class StudentProfileController : ControllerBase
 {
@@ -42,6 +42,72 @@ public class StudentProfileController : ControllerBase
         if (!result.IsSuccess)
         {
             return BadRequest(result);
+        }
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Updates the student profile for the authenticated user.
+    /// </summary>
+    /// <param name="dto">The updated profile data.</param>
+    /// <returns>The updated student ID.</returns>
+    [HttpPut("profile")]
+    public async Task<ActionResult<ServiceResponse<int>>> UpdateProfile([FromBody] StudentProfileUpdateDto dto)
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+        if (userIdClaim is null || !int.TryParse(userIdClaim.Value, out var userId))
+        {
+            return Unauthorized(ServiceResponse<int>.Failure("Invalid or missing user token."));
+        }
+
+        var result = await _studentService.UpdateStudentProfileAsync(userId, dto);
+
+        if (!result.IsSuccess)
+        {
+            return BadRequest(result);
+        }
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Searches for students based on the provided criteria.
+    /// </summary>
+    /// <param name="searchDto">The search criteria.</param>
+    /// <returns>A paged list of student search results.</returns>
+    [HttpGet("search")]
+    [AllowAnonymous]
+    public async Task<ActionResult<ServiceResponse<PagedResult<StudentSearchResultDto>>>> Search([FromQuery] StudentSearchDto searchDto)
+    {
+        var result = await _studentService.SearchStudentsAsync(searchDto);
+
+        if (!result.IsSuccess)
+        {
+            return BadRequest(result);
+        }
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Gets the student profile for the authenticated user.
+    /// </summary>
+    /// <returns>The student profile.</returns>
+    [HttpGet("profile")]
+    public async Task<ActionResult<ServiceResponse<StudentResponseDto>>> GetProfile()
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+        if (userIdClaim is null || !int.TryParse(userIdClaim.Value, out var userId))
+        {
+            return Unauthorized(ServiceResponse<StudentResponseDto>.Failure("Invalid or missing user token."));
+        }
+
+        var result = await _studentService.GetProfileAsync(userId);
+
+        if (!result.IsSuccess)
+        {
+            return NotFound(result);
         }
 
         return Ok(result);

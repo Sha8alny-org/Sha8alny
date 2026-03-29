@@ -23,4 +23,7 @@ public class CreateStudentProfileDto
 
     // Skills (list of Skill IDs to link)
     public List<int> SkillIds { get; set; } = new();
+
+    // Internship Days (optional initial value)
+    public int TotalInternshipDays { get; set; } = 0;
 }

@@ -75,6 +75,9 @@ namespace Sh8lny.Persistence.Configurations
             builder.Property(s => s.TotalReviews)
                 .HasDefaultValue(0);
 
+            builder.Property(s => s.TotalInternshipDays)
+                .HasDefaultValue(0);
+
             // Ignore computed property
             builder.Ignore(s => s.FullName);
 

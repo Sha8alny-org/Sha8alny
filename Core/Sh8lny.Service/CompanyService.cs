@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using Sh8lny.Abstraction.Repositories;
 using Sh8lny.Abstraction.Services;
 using Sh8lny.Domain.Models;
@@ -128,6 +129,144 @@ public class CompanyService : ICompanyService
         catch (Exception ex)
         {
             return ServiceResponse<CompanyDto>.Failure("An error occurred while retrieving the company profile.",
+                new List<string> { ex.Message });
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task<ServiceResponse<int>> UpdateCompanyProfileAsync(int userId, CompanyProfileUpdateDto dto)
+    {
+        try
+        {
+            var company = await _unitOfWork.Companies.FindSingleAsync(c => c.UserID == userId);
+            if (company is null)
+            {
+                return ServiceResponse<int>.Failure("Company profile not found.");
+            }
+
+            if (!string.IsNullOrWhiteSpace(dto.CompanyName))
+                company.CompanyName = dto.CompanyName;
+
+            if (dto.Description is not null)
+                company.Description = dto.Description;
+
+            if (dto.Industry is not null)
+                company.Industry = dto.Industry;
+
+            if (dto.WebsiteUrl is not null)
+                company.Website = dto.WebsiteUrl;
+
+            if (dto.Address is not null)
+                company.Address = dto.Address;
+
+            if (dto.City is not null)
+                company.City = dto.City;
+
+            if (dto.State is not null)
+                company.State = dto.State;
+
+            if (dto.Country is not null)
+                company.Country = dto.Country;
+
+            if (dto.ContactEmail is not null)
+                company.ContactEmail = dto.ContactEmail;
+
+            if (dto.ContactPhone is not null)
+                company.ContactPhone = dto.ContactPhone;
+
+            if (dto.LogoUrl is not null)
+                company.CompanyLogo = dto.LogoUrl;
+
+            company.UpdatedAt = DateTime.UtcNow;
+
+            _unitOfWork.Companies.Update(company);
+            await _unitOfWork.SaveAsync();
+
+            return ServiceResponse<int>.Success(company.CompanyID, "Company profile updated successfully.");
+        }
+        catch (Exception ex)
+        {
+            return ServiceResponse<int>.Failure("An error occurred while updating the profile.",
+                new List<string> { ex.Message });
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task<ServiceResponse<PagedResult<CompanySearchResultDto>>> SearchCompaniesAsync(CompanySearchDto searchDto)
+    {
+        try
+        {
+            Expression<Func<Company, bool>>? predicate = null;
+
+            if (!string.IsNullOrWhiteSpace(searchDto.Keyword))
+            {
+                var keyword = searchDto.Keyword.ToLower();
+                predicate = c =>
+                    c.CompanyName.ToLower().Contains(keyword) ||
+                    (c.Description != null && c.Description.ToLower().Contains(keyword));
+            }
+
+            IEnumerable<Company> companies;
+
+            if (predicate != null)
+            {
+                companies = await _unitOfWork.Companies.FindAsync(predicate);
+            }
+            else
+            {
+                companies = await _unitOfWork.Companies.GetAllAsync();
+            }
+
+            var query = companies.AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(searchDto.Industry))
+            {
+                query = query.Where(c => c.Industry != null && c.Industry.ToLower() == searchDto.Industry.ToLower());
+            }
+
+            if (!string.IsNullOrWhiteSpace(searchDto.City))
+            {
+                query = query.Where(c => c.City != null && c.City.ToLower() == searchDto.City.ToLower());
+            }
+
+            if (!string.IsNullOrWhiteSpace(searchDto.Country))
+            {
+                query = query.Where(c => c.Country != null && c.Country.ToLower() == searchDto.Country.ToLower());
+            }
+
+            var totalCount = query.Count();
+
+            var skip = (searchDto.PageNumber - 1) * searchDto.PageSize;
+            var result = query
+                .OrderByDescending(c => c.CreatedAt)
+                .Skip(skip)
+                .Take(searchDto.PageSize)
+                .Select(c => new CompanySearchResultDto
+                {
+                    Id = c.CompanyID,
+                    CompanyName = c.CompanyName,
+                    Industry = c.Industry,
+                    City = c.City,
+                    Country = c.Country,
+                    LogoUrl = c.CompanyLogo,
+                    AverageRating = c.AverageRating,
+                    CreatedAt = c.CreatedAt
+                })
+                .ToList();
+
+            var pagedResult = new PagedResult<CompanySearchResultDto>
+            {
+                Items = result,
+                TotalCount = totalCount,
+                PageNumber = searchDto.PageNumber,
+                PageSize = searchDto.PageSize
+            };
+
+            return ServiceResponse<PagedResult<CompanySearchResultDto>>.Success(pagedResult);
+        }
+        catch (Exception ex)
+        {
+            return ServiceResponse<PagedResult<CompanySearchResultDto>>.Failure("An error occurred while searching for companies.",
                 new List<string> { ex.Message });
         }
     }
