@@ -1,4 +1,5 @@
 using System.Text;
+using System.Diagnostics;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -11,6 +12,7 @@ using Sh8lny.Persistence;
 using Sh8lny.Service;
 using Sh8lny.Shared.Options;
 using Sh8lny.Web.Hubs;
+using Sh8lny.Web.Logging;
 using Sh8lny.Web.Mappings;
 using Sh8lny.Web.Services;
 
@@ -24,6 +26,12 @@ namespace Sh8lny.Web
 
             // Add services to the container.
             builder.Services.AddControllers();
+            builder.Services.AddHttpClient();
+            builder.Services.AddSingleton<ILoggerProvider, DiscordWebhookLoggerProvider>();
+            builder.Logging.AddFilter<DiscordWebhookLoggerProvider>(null, LogLevel.Information);
+            builder.Logging.AddFilter<DiscordWebhookLoggerProvider>("Microsoft.AspNetCore", LogLevel.Warning);
+            builder.Logging.AddFilter<DiscordWebhookLoggerProvider>("System.Net.Http", LogLevel.Warning);
+            builder.Logging.AddFilter<DiscordWebhookLoggerProvider>("Microsoft.Extensions.Http", LogLevel.Warning);
 
             builder.Services.AddCors(options =>
             {
@@ -199,6 +207,28 @@ namespace Sh8lny.Web
 
             // Enable serving static files from wwwroot
             app.UseStaticFiles();
+
+            app.Use(async (context, next) =>
+            {
+                var stopwatch = Stopwatch.StartNew();
+
+                try
+                {
+                    await next();
+                }
+                finally
+                {
+                    stopwatch.Stop();
+
+                    var logger = context.RequestServices.GetRequiredService<ILogger<Program>>();
+                    logger.LogInformation(
+                        "HTTP {Method} {Path} responded {StatusCode} in {ElapsedMs:0.0000} ms",
+                        context.Request.Method,
+                        context.Request.Path,
+                        context.Response.StatusCode,
+                        stopwatch.Elapsed.TotalMilliseconds);
+                }
+            });
 
             app.UseCors("AllowAll");
 

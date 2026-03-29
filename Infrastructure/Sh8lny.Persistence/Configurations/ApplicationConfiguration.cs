@@ -47,6 +47,9 @@ namespace Sh8lny.Persistence.Configurations
 
             builder.Property(a => a.PaidAt);
 
+            builder.Property(a => a.BidAmount)
+                .HasPrecision(18, 2);
+
             // Completion fields
             builder.Property(a => a.CompletedAt);
 

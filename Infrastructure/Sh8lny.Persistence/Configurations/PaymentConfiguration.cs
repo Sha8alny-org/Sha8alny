@@ -51,17 +51,17 @@ namespace Sh8lny.Persistence.Configurations
 
             // Relationships
             builder.HasOne(p => p.Project)
-                .WithMany()
+                .WithMany(project => project.Payments)
                 .HasForeignKey(p => p.ProjectID)
                 .OnDelete(DeleteBehavior.Restrict);
 
             builder.HasOne(p => p.Student)
-                .WithMany()
+                .WithMany(student => student.Payments)
                 .HasForeignKey(p => p.StudentID)
                 .OnDelete(DeleteBehavior.Restrict);
 
             builder.HasOne(p => p.Company)
-                .WithMany()
+                .WithMany(company => company.Payments)
                 .HasForeignKey(p => p.CompanyID)
                 .OnDelete(DeleteBehavior.Restrict);
         }

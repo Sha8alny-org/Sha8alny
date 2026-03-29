@@ -30,6 +30,10 @@ namespace Sh8lny.Persistence.Configurations
             builder.Property(m => m.OrderIndex)
                 .IsRequired();
 
+            builder.Property(m => m.Weight)
+                .HasPrecision(18, 2)
+                .IsRequired();
+
             builder.HasIndex(m => new { m.ProjectId, m.OrderIndex })
                 .HasDatabaseName("IDX_ProjectModules_Project_Order");
 
