@@ -49,10 +49,11 @@ namespace Sh8lny.Abstraction.Repositories
         
         
        // for when we add payment to the project (IF WE ADD IT lol)        
-        
+       
         Task BeginTransactionAsync();
         Task CommitTransactionAsync();
         Task RollbackTransactionAsync();
-       
+        
+        Task<Student?> GetStudentWithSkillsAsync(int userId);
     }
 }

@@ -29,6 +29,8 @@ public class StudentResponseDto
     public int TotalReviews { get; set; }
     public int TotalInternshipDays { get; set; }
 
+    public List<StudentSkillDto> Skills { get; set; } = new();
+
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 

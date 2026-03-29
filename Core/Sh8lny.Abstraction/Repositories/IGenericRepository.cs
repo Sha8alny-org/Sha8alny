@@ -8,6 +8,7 @@ namespace Sh8lny.Abstraction.Repositories
         Task<IEnumerable<T>> GetAllAsync();
         Task<IEnumerable<T>> FindAsync(Expression<Func<T, bool>> predicate);
         Task<T?> FindSingleAsync(Expression<Func<T, bool>> predicate);
+        Task<T?> FindSingleAsync(Expression<Func<T, bool>> predicate, params Expression<Func<T, object>>[] includes);
         Task<T> AddAsync(T entity);
         Task AddRangeAsync(IEnumerable<T> entities);
         void Update(T entity);

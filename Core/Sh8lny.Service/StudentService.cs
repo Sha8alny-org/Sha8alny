@@ -163,7 +163,8 @@ public class StudentService : IStudentService
     {
         try
         {
-            var student = await _unitOfWork.Students.FindSingleAsync(s => s.UserID == userId);
+            var student = await _unitOfWork.GetStudentWithSkillsAsync(userId);
+
             if (student is null)
             {
                 return ServiceResponse<int>.Failure("Student profile not found.");
@@ -215,6 +216,45 @@ public class StudentService : IStudentService
 
             if (dto.Country is not null)
                 student.Country = dto.Country;
+
+            // Handle Skills Update
+            if (dto.SkillIds is not null)
+            {
+                var existingSkills = student.StudentSkills ?? new List<StudentSkill>();
+                var existingSkillIds = existingSkills.Select(ss => ss.SkillID).ToList();
+                var newSkillIds = dto.SkillIds.Distinct().ToList();
+
+                // Remove skills that are not in the new list
+                var skillsToRemove = existingSkills
+                    .Where(ss => !newSkillIds.Contains(ss.SkillID))
+                    .ToList();
+                
+                foreach (var skill in skillsToRemove)
+                {
+                    _unitOfWork.StudentSkills.Remove(skill);
+                }
+
+                // Add new skills that were not in the existing list
+                var skillsToAdd = newSkillIds
+                    .Where(id => !existingSkillIds.Contains(id))
+                    .ToList();
+
+                foreach (var skillId in skillsToAdd)
+                {
+                    var skill = await _unitOfWork.Skills.GetByIdAsync(skillId);
+                    if (skill is not null)
+                    {
+                        var studentSkill = new StudentSkill
+                        {
+                            StudentID = student.StudentID,
+                            SkillID = skillId,
+                            ProficiencyLevel = ProficiencyLevel.Beginner,
+                            CreatedAt = DateTime.UtcNow
+                        };
+                        await _unitOfWork.StudentSkills.AddAsync(studentSkill);
+                    }
+                }
+            }
 
             student.UpdatedAt = DateTime.UtcNow;
 
@@ -324,12 +364,22 @@ public class StudentService : IStudentService
     {
         try
         {
-            var student = await _unitOfWork.Students.FindSingleAsync(s => s.UserID == userId);
+            var student = await _unitOfWork.GetStudentWithSkillsAsync(userId);
 
             if (student is null)
             {
                 return ServiceResponse<StudentResponseDto>.Failure("Student profile not found.");
             }
+
+            // Safely map skills with null checks
+            var skills = student.StudentSkills?.Select(ss => new Shared.DTOs.StudentProfile.StudentSkillDto
+            {
+                Id = ss.SkillID,
+                Name = ss.Skill?.SkillName ?? string.Empty,
+                Category = ss.Skill?.SkillCategory?.ToString(),
+                Description = ss.Skill?.Description,
+                IsActive = ss.Skill?.IsActive ?? false
+            }).ToList() ?? new List<Shared.DTOs.StudentProfile.StudentSkillDto>();
 
             var studentDto = new StudentResponseDto
             {
@@ -343,6 +393,7 @@ public class StudentService : IStudentService
                 GitHubProfile = student.GitHubProfile,
                 UniversityID = student.UniversityID,
                 DepartmentID = student.DepartmentID,
+                DepartmentName = student.Department?.DepartmentName,
                 AcademicYear = student.AcademicYear?.ToString(),
                 StudentIDNumber = student.StudentIDNumber,
                 City = student.City,
@@ -353,6 +404,7 @@ public class StudentService : IStudentService
                 AverageRating = student.AverageRating,
                 TotalReviews = student.TotalReviews,
                 TotalInternshipDays = student.TotalInternshipDays,
+                Skills = skills,
                 CreatedAt = student.CreatedAt,
                 UpdatedAt = student.UpdatedAt
             };

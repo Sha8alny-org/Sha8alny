@@ -171,6 +171,15 @@ namespace Sh8lny.Persistence.Repositories
             }
         }
 
+        public async Task<Student?> GetStudentWithSkillsAsync(int userId)
+        {
+            return await _context.Students
+                .Include(s => s.StudentSkills)
+                    .ThenInclude(ss => ss.Skill)
+                .Include(s => s.Department)
+                .FirstOrDefaultAsync(s => s.UserID == userId);
+        }
+
         protected virtual void Dispose(bool disposing)
         {
             if (!_disposed && disposing)
