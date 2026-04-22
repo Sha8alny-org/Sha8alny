@@ -19,8 +19,8 @@ namespace Sh8lny.Domain.Models
         public string? CoverLetter { get; set; }
         public required string Resume { get; set; }
         public string? PortfolioURL { get; set; }
-        public string? ProposalDocument { get; set; }
-        public string? Duration { get; set; }
+        public string? ProposalFileUrl { get; set; }
+        public string? StudentCvUrl { get; set; }
         public decimal? BidAmount { get; set; }
 
         // Status tracking

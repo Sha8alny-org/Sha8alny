@@ -34,6 +34,9 @@ namespace Sh8lny.Persistence.Configurations
             builder.Property(s => s.ProfilePicture)
                 .HasMaxLength(500);
 
+            builder.Property(s => s.CvFileUrl)
+                .HasMaxLength(500);
+
             builder.Property(s => s.StudentIDNumber)
                 .HasMaxLength(50);
 

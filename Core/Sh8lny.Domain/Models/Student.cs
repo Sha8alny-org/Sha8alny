@@ -21,6 +21,7 @@ namespace Sh8lny.Domain.Models
         public string? Phone { get; set; }
         public string? ProfilePicture { get; set; }
         public string? GitHubProfile { get; set; }
+        public string? CvFileUrl { get; set; }
 
         // Academic info
         public int? UniversityID { get; set; }

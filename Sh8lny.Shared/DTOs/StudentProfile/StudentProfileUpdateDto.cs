@@ -1,3 +1,6 @@
+using System.ComponentModel.DataAnnotations;
+using Sh8lny.Shared.Validation;
+
 namespace Sh8lny.Shared.DTOs.StudentProfile;
 
 public class StudentProfileUpdateDto
@@ -8,6 +11,9 @@ public class StudentProfileUpdateDto
     public string? Phone { get; set; }
     public string? ProfilePicture { get; set; }
     public string? GitHubProfile { get; set; }
+
+    [AllowedFileExtensions(".pdf", ".docx", ".pptx")]
+    public string? CvFileUrl { get; set; }
     
     public int? UniversityID { get; set; }
     public int? DepartmentID { get; set; }
@@ -19,7 +25,7 @@ public class StudentProfileUpdateDto
     public string? Country { get; set; }
 
     // Skills (list of Skill IDs to update)
-    public List<int>? SkillIds { get; set; }
+    public List<int> SkillIds { get; set; } = new List<int>();
 }
 
 public enum AcademicYearDto

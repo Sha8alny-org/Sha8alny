@@ -155,6 +155,7 @@ namespace Sh8lny.Web
             builder.Services.AddScoped<IMailService, MailService>();
             builder.Services.AddScoped<IProjectService, ProjectService>();
             builder.Services.AddScoped<IApplicationService, ApplicationService>();
+            builder.Services.AddScoped<IMasterDataService, MasterDataService>();
             builder.Services.AddScoped<INotificationService, NotificationService>();
             builder.Services.AddScoped<ICertificateService, CertificateService>();
             builder.Services.AddScoped<IProjectExecutionService, ProjectExecutionService>();
@@ -203,7 +204,10 @@ namespace Sh8lny.Web
                 options.RoutePrefix = string.Empty; // Swagger at root URL
             });
 
-            app.UseHttpsRedirection();
+            if (!app.Environment.IsDevelopment())
+            {
+                app.UseHttpsRedirection();
+            }
 
             // Enable serving static files from wwwroot
             app.UseStaticFiles();

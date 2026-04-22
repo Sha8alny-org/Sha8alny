@@ -94,15 +94,26 @@ public class ApplicationService : IApplicationService
                     missingSkillNames);
             }
 
+            var projectType = project.ProjectType?.ToString();
+            decimal resolvedBidAmount;
+            if (string.Equals(projectType, "Internship", StringComparison.OrdinalIgnoreCase))
+            {
+                resolvedBidAmount = 0;
+            }
+            else
+            {
+                resolvedBidAmount = dto.BidAmount;
+            }
+
             // Create application
             var application = new Application
             {
                 ProjectID = dto.ProjectId,
                 StudentID = student.StudentID,
-                ProposalDocument = dto.Proposal,
-                Duration = dto.Duration,
-                BidAmount = dto.BidAmount,
-                Resume = string.Empty, // Required field - can be updated later
+                ProposalFileUrl = dto.ProposalFileUrl,
+                StudentCvUrl = dto.StudentCvUrl,
+                BidAmount = resolvedBidAmount,
+                Resume = dto.StudentCvUrl,
                 Status = ApplicationStatus.Pending,
                 AppliedAt = DateTime.UtcNow
             };
@@ -199,7 +210,7 @@ public class ApplicationService : IApplicationService
                     ApplicationId = app.ApplicationID,
                     StudentName = student?.FullName ?? "Unknown",
                     StudentTitle = student?.Bio,
-                    Proposal = app.ProposalDocument,
+                    Proposal = app.ProposalFileUrl,
                     AppliedDate = app.AppliedAt
                 });
             }

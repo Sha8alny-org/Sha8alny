@@ -28,8 +28,11 @@ public class StudentResponseDto
     public decimal AverageRating { get; set; }
     public int TotalReviews { get; set; }
     public int TotalInternshipDays { get; set; }
+    public string? CvFileUrl { get; set; }
 
     public List<StudentSkillDto> Skills { get; set; } = new();
+    public IReadOnlyList<EducationDto> Educations { get; set; } = Array.Empty<EducationDto>();
+    public IReadOnlyList<ExperienceDto> Experiences { get; set; } = Array.Empty<ExperienceDto>();
 
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }

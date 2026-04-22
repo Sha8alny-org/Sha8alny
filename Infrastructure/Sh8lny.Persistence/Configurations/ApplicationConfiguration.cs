@@ -29,6 +29,12 @@ namespace Sh8lny.Persistence.Configurations
             builder.Property(a => a.PortfolioURL)
                 .HasMaxLength(500);
 
+            builder.Property(a => a.ProposalFileUrl)
+                .HasMaxLength(500);
+
+            builder.Property(a => a.StudentCvUrl)
+                .HasMaxLength(500);
+
             builder.Property(a => a.Status)
                 .IsRequired()
                 .HasConversion<string>()

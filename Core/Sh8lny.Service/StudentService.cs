@@ -54,6 +54,7 @@ public class StudentService : IStudentService
                 Phone = dto.Phone,
                 ProfilePicture = dto.ProfilePicture,
                 GitHubProfile = dto.GitHubProfile,
+                CvFileUrl = dto.CvFileUrl,
                 City = dto.City,
                 State = dto.State,
                 Country = dto.Country,
@@ -188,6 +189,9 @@ public class StudentService : IStudentService
             if (dto.GitHubProfile is not null)
                 student.GitHubProfile = dto.GitHubProfile;
 
+            if (dto.CvFileUrl is not null)
+                student.CvFileUrl = dto.CvFileUrl;
+
             if (dto.UniversityID.HasValue)
                 student.UniversityID = dto.UniversityID;
 
@@ -218,7 +222,7 @@ public class StudentService : IStudentService
                 student.Country = dto.Country;
 
             // Handle Skills Update
-            if (dto.SkillIds is not null)
+            if (dto.SkillIds.Count > 0)
             {
                 var existingSkills = student.StudentSkills ?? new List<StudentSkill>();
                 var existingSkillIds = existingSkills.Select(ss => ss.SkillID).ToList();
@@ -404,7 +408,33 @@ public class StudentService : IStudentService
                 AverageRating = student.AverageRating,
                 TotalReviews = student.TotalReviews,
                 TotalInternshipDays = student.TotalInternshipDays,
+                CvFileUrl = student.CvFileUrl,
                 Skills = skills,
+                Educations = (student.Educations ?? new List<Education>())
+                    .Select(e => new EducationDto
+                    {
+                        Id = e.EducationID,
+                        UniversityName = e.UniversityName,
+                        Degree = e.Degree,
+                        FieldOfStudy = e.FieldOfStudy,
+                        StartYear = e.StartYear,
+                        EndYear = e.EndYear,
+                        Description = e.Description
+                    })
+                    .ToList(),
+                Experiences = (student.Experiences ?? new List<Experience>())
+                    .Select(ex => new ExperienceDto
+                    {
+                        Id = ex.ExperienceID,
+                        CompanyName = ex.CompanyName,
+                        Role = ex.Role,
+                        Location = ex.Location,
+                        StartDate = ex.StartDate,
+                        EndDate = ex.EndDate,
+                        IsCurrent = ex.IsCurrent,
+                        Description = ex.Description
+                    })
+                    .ToList(),
                 CreatedAt = student.CreatedAt,
                 UpdatedAt = student.UpdatedAt
             };

@@ -176,6 +176,8 @@ namespace Sh8lny.Persistence.Repositories
             return await _context.Students
                 .Include(s => s.StudentSkills)
                     .ThenInclude(ss => ss.Skill)
+                .Include(s => s.Educations)
+                .Include(s => s.Experiences)
                 .Include(s => s.Department)
                 .FirstOrDefaultAsync(s => s.UserID == userId);
         }
