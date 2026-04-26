@@ -34,6 +34,8 @@ namespace Sh8lny.Domain.Models
     {
         Pending,
         InProgress,
-        Completed
+        Completed,
+        Approved,
+        Rejected
     }
 }

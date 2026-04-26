@@ -304,6 +304,115 @@ public class ProjectExecutionService : IProjectExecutionService
     }
 
     /// <inheritdoc />
+    public async Task<ServiceResponse<bool>> ReviewModuleAsync(int companyUserId, int moduleId, ReviewModuleDto dto)
+    {
+        try
+        {
+            var module = await _unitOfWork.ProjectModules.GetByIdAsync(moduleId);
+            if (module is null)
+            {
+                return ServiceResponse<bool>.Failure("Module not found.");
+            }
+
+            var company = await _unitOfWork.Companies.FindSingleAsync(c => c.UserID == companyUserId);
+            if (company is null)
+            {
+                return ServiceResponse<bool>.Failure("Company profile not found.");
+            }
+
+            var project = await _unitOfWork.Projects.GetByIdAsync(module.ProjectId);
+            if (project is null || project.CompanyID != company.CompanyID)
+            {
+                return ServiceResponse<bool>.Failure("You do not have permission to review this module.");
+            }
+
+            if (!string.Equals(dto.Status, "Approved", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(dto.Status, "Rejected", StringComparison.OrdinalIgnoreCase))
+            {
+                return ServiceResponse<bool>.Failure("Status must be either 'Approved' or 'Rejected'.");
+            }
+
+            var applicationIds = (await _unitOfWork.Applications
+                    .FindAsync(a => a.ProjectID == module.ProjectId))
+                .Select(a => a.ApplicationID)
+                .ToHashSet();
+
+            if (applicationIds.Count == 0)
+            {
+                return ServiceResponse<bool>.Failure("No applications found for this module's project.");
+            }
+
+            var progressRecords = (await _unitOfWork.ApplicationModuleProgress
+                    .FindAsync(p => p.ProjectModuleId == moduleId))
+                .Where(p => applicationIds.Contains(p.ApplicationId))
+                .ToList();
+
+            if (progressRecords.Count == 0)
+            {
+                return ServiceResponse<bool>.Failure("No module progress found to review.");
+            }
+
+            if (string.Equals(dto.Status, "Approved", StringComparison.OrdinalIgnoreCase))
+            {
+                module.Status = ModuleStatus.Approved;
+
+                foreach (var progress in progressRecords)
+                {
+                    progress.ProgressPercentage = 100;
+                    progress.IsCompleted = true;
+                    progress.CompletedAt ??= DateTime.UtcNow;
+                    progress.UpdatedAt = DateTime.UtcNow;
+                    if (!string.IsNullOrWhiteSpace(dto.CompanyFeedback))
+                    {
+                        progress.Note = dto.CompanyFeedback;
+                    }
+                    _unitOfWork.ApplicationModuleProgress.Update(progress);
+
+                    var application = await _unitOfWork.Applications.GetByIdAsync(progress.ApplicationId);
+                    if (application is not null &&
+                        application.Status != ApplicationStatus.Completed)
+                    {
+                        application.Status = ApplicationStatus.InProgress;
+                        _unitOfWork.Applications.Update(application);
+                    }
+                }
+            }
+            else
+            {
+                module.Status = ModuleStatus.Rejected;
+
+                foreach (var progress in progressRecords)
+                {
+                    progress.IsCompleted = false;
+                    progress.ProgressPercentage = Math.Min(progress.ProgressPercentage, 99);
+                    progress.UpdatedAt = DateTime.UtcNow;
+                    progress.Note = dto.CompanyFeedback;
+                    _unitOfWork.ApplicationModuleProgress.Update(progress);
+
+                    var application = await _unitOfWork.Applications.GetByIdAsync(progress.ApplicationId);
+                    if (application is not null &&
+                        application.Status != ApplicationStatus.Completed)
+                    {
+                        application.Status = ApplicationStatus.InProgress;
+                        _unitOfWork.Applications.Update(application);
+                    }
+                }
+            }
+
+            _unitOfWork.ProjectModules.Update(module);
+            await _unitOfWork.SaveAsync();
+
+            return ServiceResponse<bool>.Success(true, "Module review submitted successfully.");
+        }
+        catch (Exception ex)
+        {
+            return ServiceResponse<bool>.Failure(
+                "An error occurred while reviewing the module.",
+                new List<string> { ex.Message });
+        }
+    }
+
+    /// <inheritdoc />
     public async Task<ServiceResponse<bool>> DeleteModuleAsync(int companyUserId, int moduleId)
     {
         try

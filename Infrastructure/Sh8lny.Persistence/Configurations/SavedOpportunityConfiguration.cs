@@ -27,7 +27,7 @@ namespace Sh8lny.Persistence.Configurations
                    .OnDelete(DeleteBehavior.Cascade); 
 
             builder.HasOne(s => s.Project)
-                   .WithMany() 
+                   .WithMany(p => p.SavedOpportunities)
                    .HasForeignKey(s => s.ProjectID)
                    .OnDelete(DeleteBehavior.Cascade); 
         }

@@ -55,5 +55,6 @@ namespace Sh8lny.Abstraction.Repositories
         Task RollbackTransactionAsync();
         
         Task<Student?> GetStudentWithSkillsAsync(int userId);
+        Task<IEnumerable<SavedOpportunity>> GetSavedOpportunitiesWithProjectAsync(int studentId);
     }
 }

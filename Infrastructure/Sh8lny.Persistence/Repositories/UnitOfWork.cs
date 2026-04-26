@@ -182,6 +182,16 @@ namespace Sh8lny.Persistence.Repositories
                 .FirstOrDefaultAsync(s => s.UserID == userId);
         }
 
+        public async Task<IEnumerable<SavedOpportunity>> GetSavedOpportunitiesWithProjectAsync(int studentId)
+        {
+            return await _context.Set<SavedOpportunity>()
+                .Include(s => s.Project)
+                .ThenInclude(p => p.Company)
+                .Where(s => s.StudentID == studentId)
+                .OrderByDescending(s => s.SavedAt)
+                .ToListAsync();
+        }
+
         protected virtual void Dispose(bool disposing)
         {
             if (!_disposed && disposing)

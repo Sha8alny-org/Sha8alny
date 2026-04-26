@@ -137,6 +137,32 @@ public class ExecutionController : ControllerBase
     }
 
     /// <summary>
+    /// Reviews a module milestone (approve/reject) by the owning company.
+    /// </summary>
+    /// <param name="moduleId">The module ID.</param>
+    /// <param name="dto">Review status and optional company feedback.</param>
+    /// <returns>Success or failure response.</returns>
+    [HttpPut("modules/{moduleId}/review")]
+    [Authorize(Roles = "Company")]
+    public async Task<ActionResult<ServiceResponse<bool>>> ReviewModule(int moduleId, [FromBody] ReviewModuleDto dto)
+    {
+        var userId = GetCurrentUserId();
+        if (userId is null)
+        {
+            return Unauthorized(ServiceResponse<bool>.Failure("Invalid or missing user token."));
+        }
+
+        var result = await _executionService.ReviewModuleAsync(userId.Value, moduleId, dto);
+
+        if (!result.IsSuccess)
+        {
+            return BadRequest(result);
+        }
+
+        return Ok(result);
+    }
+
+    /// <summary>
     /// Completes a job/project formally after all modules are finished.
     /// Only the company owner can complete the job.
     /// </summary>

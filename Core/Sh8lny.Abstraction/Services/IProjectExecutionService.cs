@@ -41,6 +41,15 @@ public interface IProjectExecutionService
     Task<ServiceResponse<ProjectProgressDto>> GetApplicationProgressAsync(int applicationId);
 
     /// <summary>
+    /// Reviews a module progress update by company (approve/reject).
+    /// </summary>
+    /// <param name="companyUserId">The company user ID (must own project).</param>
+    /// <param name="moduleId">The module ID.</param>
+    /// <param name="dto">Review decision and optional feedback.</param>
+    /// <returns>Service response indicating success or failure.</returns>
+    Task<ServiceResponse<bool>> ReviewModuleAsync(int companyUserId, int moduleId, ReviewModuleDto dto);
+
+    /// <summary>
     /// Deletes a module from a project.
     /// </summary>
     /// <param name="companyUserId">The company user ID.</param>

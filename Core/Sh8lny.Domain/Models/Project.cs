@@ -59,6 +59,7 @@ namespace Sh8lny.Domain.Models
         public ICollection<Payment> Payments { get; set; } = new HashSet<Payment>();
         public ICollection<CompletedOpportunity> CompletedOpportunities { get; set; } = new HashSet<CompletedOpportunity>();
         public ICollection<ProjectModule> Modules { get; set; } = new HashSet<ProjectModule>();
+        public ICollection<SavedOpportunity> SavedOpportunities { get; set; } = new HashSet<SavedOpportunity>();
     }
 
     /// <summary>

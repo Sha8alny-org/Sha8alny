@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Sh8lny.Abstraction.Services;
 using Sh8lny.Shared.DTOs.Common;
+using Sh8lny.Shared.DTOs.Projects;
 using Sh8lny.Shared.DTOs.StudentProfile;
 
 namespace Sh8lny.Web.Controllers;
@@ -16,10 +17,12 @@ namespace Sh8lny.Web.Controllers;
 public class StudentProfileController : ControllerBase
 {
     private readonly IStudentService _studentService;
+    private readonly IProjectService _projectService;
 
-    public StudentProfileController(IStudentService studentService)
+    public StudentProfileController(IStudentService studentService, IProjectService projectService)
     {
         _studentService = studentService;
+        _projectService = projectService;
     }
 
     /// <summary>
@@ -108,6 +111,46 @@ public class StudentProfileController : ControllerBase
         if (!result.IsSuccess)
         {
             return NotFound(result);
+        }
+
+        return Ok(result);
+    }
+
+    [HttpPost("saved-projects/{projectId}")]
+    [Authorize(Roles = "Student")]
+    public async Task<ActionResult<ServiceResponse<bool>>> ToggleSavedProject(int projectId)
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+        if (userIdClaim is null || !int.TryParse(userIdClaim.Value, out var userId))
+        {
+            return Unauthorized(ServiceResponse<bool>.Failure("Invalid or missing user token."));
+        }
+
+        var result = await _projectService.ToggleSaveProjectAsync(userId, projectId);
+
+        if (!result.IsSuccess)
+        {
+            return BadRequest(result);
+        }
+
+        return Ok(result);
+    }
+
+    [HttpGet("saved-projects")]
+    [Authorize(Roles = "Student")]
+    public async Task<ActionResult<ServiceResponse<IEnumerable<SavedProjectResponseDto>>>> GetSavedProjects()
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+        if (userIdClaim is null || !int.TryParse(userIdClaim.Value, out var userId))
+        {
+            return Unauthorized(ServiceResponse<IEnumerable<SavedProjectResponseDto>>.Failure("Invalid or missing user token."));
+        }
+
+        var result = await _projectService.GetSavedProjectsAsync(userId);
+
+        if (!result.IsSuccess)
+        {
+            return BadRequest(result);
         }
 
         return Ok(result);

@@ -486,6 +486,89 @@ public class ProjectService : IProjectService
         }
     }
 
+    /// <inheritdoc />
+    public async Task<ServiceResponse<bool>> ToggleSaveProjectAsync(int userId, int projectId)
+    {
+        try
+        {
+            var student = await _unitOfWork.Students.FindSingleAsync(s => s.UserID == userId);
+            if (student is null)
+            {
+                return ServiceResponse<bool>.Failure("Student profile not found.");
+            }
+
+            var project = await _unitOfWork.Projects.GetByIdAsync(projectId);
+            if (project is null)
+            {
+                return ServiceResponse<bool>.Failure("Project not found.");
+            }
+
+            var existing = await _unitOfWork.SavedOpportunities
+                .FindSingleAsync(s => s.StudentID == student.StudentID && s.ProjectID == projectId);
+
+            if (existing is not null)
+            {
+                _unitOfWork.SavedOpportunities.Remove(existing);
+                await _unitOfWork.SaveAsync();
+                return ServiceResponse<bool>.Success(false, "Project removed from saved list.");
+            }
+
+            await _unitOfWork.SavedOpportunities.AddAsync(new SavedOpportunity
+            {
+                StudentID = student.StudentID,
+                ProjectID = projectId,
+                SavedAt = DateTime.UtcNow
+            });
+
+            await _unitOfWork.SaveAsync();
+            return ServiceResponse<bool>.Success(true, "Project saved successfully.");
+        }
+        catch (Exception ex)
+        {
+            return ServiceResponse<bool>.Failure(
+                "An error occurred while toggling saved project.",
+                new List<string> { ex.Message });
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task<ServiceResponse<IEnumerable<SavedProjectResponseDto>>> GetSavedProjectsAsync(int userId)
+    {
+        try
+        {
+            var student = await _unitOfWork.Students.FindSingleAsync(s => s.UserID == userId);
+            if (student is null)
+            {
+                return ServiceResponse<IEnumerable<SavedProjectResponseDto>>.Failure("Student profile not found.");
+            }
+
+            var saved = await _unitOfWork.GetSavedOpportunitiesWithProjectAsync(student.StudentID);
+
+            var result = saved
+                .Where(s => s.Project is not null)
+                .Select(s => new SavedProjectResponseDto
+                {
+                    ProjectId = s.ProjectID,
+                    Title = s.Project.ProjectName,
+                    Description = s.Project.Description,
+                    ProjectType = s.Project.ProjectType?.ToString(),
+                    CompanyName = s.Project.Company?.CompanyName,
+                    Deadline = s.Project.Deadline,
+                    Status = s.Project.Status.ToString(),
+                    SavedAt = s.SavedAt
+                })
+                .ToList();
+
+            return ServiceResponse<IEnumerable<SavedProjectResponseDto>>.Success(result);
+        }
+        catch (Exception ex)
+        {
+            return ServiceResponse<IEnumerable<SavedProjectResponseDto>>.Failure(
+                "An error occurred while retrieving saved projects.",
+                new List<string> { ex.Message });
+        }
+    }
+
     /// <summary>
     /// Applies preset-based sorting to the project collection.
     /// Supported presets: newest, oldest, deadline_asc, deadline_desc,
