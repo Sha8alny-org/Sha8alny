@@ -1,0 +1,68 @@
+name: Sha8alny API CI/CD Pipeline
+
+on:
+  push:
+    branches: [ "main", "develop" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  PROJECT_ID: sha8alny-grad-project
+  REGION: us-central1
+  SERVICE_NAME: sha8alny-api
+  IMAGE_NAME: gcr.io/sha8alny-grad-project/api-image
+
+jobs:
+  build-and-test:
+    name: Build & Run Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET 9.0
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '9.0.x'
+
+    - name: Restore Dependencies
+      run: dotnet restore Sh8lnySolution.sln
+
+    - name: Build Application
+      run: dotnet build Sh8lnySolution.sln --configuration Release --no-restore
+
+    - name: Run xUnit Tests & Coverage
+      run: dotnet test Tests/Sh8lny.IntegrationTests/Sh8lny.IntegrationTests.csproj --configuration Release --no-build --verbosity normal --logger html
+
+  deploy-to-cloud-run:
+    name: Deploy to Google Cloud Run
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    # Note: In a real environment, you would add your GCP credentials to GitHub Secrets
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v2
+      with:
+        credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
+
+    - name: Configure Docker for GCP
+      run: gcloud auth configure-docker
+
+    - name: Build Docker Image
+      run: docker build -t ${{ env.IMAGE_NAME }}:${{ github.sha }} -f Dockerfile .
+
+    - name: Push Docker Image to Container Registry
+      run: docker push ${{ env.IMAGE_NAME }}:${{ github.sha }}
+
+    - name: Deploy to Cloud Run
+      uses: google-github-actions/deploy-cloudrun@v2
+      with:
+        service: ${{ env.SERVICE_NAME }}
+        region: ${{ env.REGION }}
+        image: ${{ env.IMAGE_NAME }}:${{ github.sha }}
+        flags: '--allow-unauthenticated --port=8080'
