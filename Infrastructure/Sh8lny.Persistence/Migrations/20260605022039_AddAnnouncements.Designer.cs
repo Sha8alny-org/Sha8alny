@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Sh8lny.Persistence.Contexts;
 
@@ -11,9 +12,11 @@ using Sh8lny.Persistence.Contexts;
 namespace Sh8lny.Persistence.Migrations
 {
     [DbContext(typeof(Sha8lnyDbContext))]
-    partial class Sha8lnyDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260605022039_AddAnnouncements")]
+    partial class AddAnnouncements
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

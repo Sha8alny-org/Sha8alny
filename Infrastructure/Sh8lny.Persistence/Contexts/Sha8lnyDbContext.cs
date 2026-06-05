@@ -62,5 +62,14 @@ namespace Sh8lny.Persistence.Contexts
         // Reviews
         public DbSet<CompanyReview> CompanyReviews { get; set; } = null!;
         public DbSet<StudentReview> StudentReviews { get; set; } = null!;
+
+        // App Configuration
+        public DbSet<AppConfig> AppConfigs { get; set; } = null!;
+
+        // Field Training
+        public DbSet<TrainingSubmission> TrainingSubmissions { get; set; } = null!;
+
+        // Announcements
+        public DbSet<Announcement> Announcements { get; set; } = null!;
     }
 }

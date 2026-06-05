@@ -39,4 +39,14 @@ public interface IAuthService
     /// Resets the user's password using the 6-digit code.
     /// </summary>
     Task<ServiceResponse<string>> ResetPasswordAsync(ResetPasswordDto dto);
+
+    /// <summary>
+    /// Updates the user's FCM push notification token.
+    /// </summary>
+    Task<ServiceResponse<bool>> UpdateFcmTokenAsync(int userId, string fcmToken);
+
+    /// <summary>
+    /// Changes the authenticated user's password after verifying the current password.
+    /// </summary>
+    Task<ServiceResponse<bool>> ChangePasswordAsync(int userId, ChangePasswordDto dto);
 }

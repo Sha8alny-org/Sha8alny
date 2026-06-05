@@ -388,5 +388,22 @@ public static class DbInitializer
         }
 
         Console.WriteLine("✅ Database seeding completed successfully!");
+
+        // ==================== APP CONFIG ====================
+
+        if (!await context.AppConfigs.AnyAsync())
+        {
+            var appConfig = new AppConfig
+            {
+                IsMaintenanceMode = false,
+                MaintenanceTitle = "Under Maintenance",
+                MaintenanceMessage = "We are currently performing scheduled maintenance. Please try again later.",
+                MinSupportedVersion = "1.0.0",
+                UpdatedAt = DateTime.UtcNow
+            };
+
+            await context.AppConfigs.AddAsync(appConfig);
+            await context.SaveChangesAsync();
+        }
     }
 }

@@ -275,4 +275,45 @@ public class AuthService : IAuthService
 
         return ServiceResponse<string>.Success("Password has been reset successfully.");
     }
+
+    /// <inheritdoc />
+    public async Task<ServiceResponse<bool>> UpdateFcmTokenAsync(int userId, string fcmToken)
+    {
+        var user = await _unitOfWork.Users.GetByIdAsync(userId);
+        if (user is null)
+            return ServiceResponse<bool>.Failure("User not found.");
+
+        user.FcmToken = fcmToken;
+        user.UpdatedAt = DateTime.UtcNow;
+
+        _unitOfWork.Users.Update(user);
+        await _unitOfWork.SaveAsync();
+
+        return ServiceResponse<bool>.Success(true, "FCM token updated successfully.");
+    }
+
+    /// <inheritdoc />
+    public async Task<ServiceResponse<bool>> ChangePasswordAsync(int userId, ChangePasswordDto dto)
+    {
+        var user = await _unitOfWork.Users.GetByIdAsync(userId);
+        if (user is null)
+            return ServiceResponse<bool>.Failure("User not found.");
+
+        // Verify current password
+        if (!BC.Verify(dto.CurrentPassword, user.PasswordHash))
+            return ServiceResponse<bool>.Failure("Current password is incorrect.");
+
+        // Validate new password confirmation
+        if (dto.NewPassword != dto.ConfirmNewPassword)
+            return ServiceResponse<bool>.Failure("New password and confirmation do not match.");
+
+        // Hash and save the new password
+        user.PasswordHash = BC.HashPassword(dto.NewPassword);
+        user.UpdatedAt = DateTime.UtcNow;
+
+        _unitOfWork.Users.Update(user);
+        await _unitOfWork.SaveAsync();
+
+        return ServiceResponse<bool>.Success(true, "Password has been changed successfully.");
+    }
 }

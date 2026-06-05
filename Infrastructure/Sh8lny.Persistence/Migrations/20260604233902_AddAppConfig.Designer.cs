@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Sh8lny.Persistence.Contexts;
 
@@ -11,9 +12,11 @@ using Sh8lny.Persistence.Contexts;
 namespace Sh8lny.Persistence.Migrations
 {
     [DbContext(typeof(Sha8lnyDbContext))]
-    partial class Sha8lnyDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260604233902_AddAppConfig")]
+    partial class AddAppConfig
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -77,45 +80,6 @@ namespace Sh8lny.Persistence.Migrations
                         .HasDatabaseName("IDX_ActivityLog_RelatedEntity");
 
                     b.ToTable("ActivityLog", (string)null);
-                });
-
-            modelBuilder.Entity("Sh8lny.Domain.Models.Announcement", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime2")
-                        .HasDefaultValueSql("GETUTCDATE()");
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasMaxLength(2000)
-                        .HasColumnType("nvarchar(2000)");
-
-                    b.Property<string>("ImageUrl")
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
-
-                    b.Property<string>("Link")
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("Announcements", (string)null);
                 });
 
             modelBuilder.Entity("Sh8lny.Domain.Models.AppConfig", b =>
@@ -1872,99 +1836,6 @@ namespace Sh8lny.Persistence.Migrations
                     b.ToTable("StudentSkills", (string)null);
                 });
 
-            modelBuilder.Entity("Sh8lny.Domain.Models.TrainingSubmission", b =>
-                {
-                    b.Property<int>("TrainingSubmissionID")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("TrainingSubmissionID"));
-
-                    b.Property<string>("AdminNotes")
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
-
-                    b.Property<DateTime?>("AdminReviewedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("ApplicationID")
-                        .HasColumnType("int");
-
-                    b.Property<string>("CertificateUrl")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<string>("CompanyEvaluationUrl")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<DateTime?>("CompanyVerifiedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("CompletedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<bool>("IsAdminApproved")
-                        .HasColumnType("bit");
-
-                    b.Property<bool>("IsCompanyVerified")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("PresentationUrl")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<string>("RejectionReason")
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
-
-                    b.Property<string>("ReportUrl")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<int?>("ReviewedByAdminId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<int>("StudentID")
-                        .HasColumnType("int");
-
-                    b.Property<string>("StudentSurveyUrl")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<DateTime>("SubmittedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime2")
-                        .HasDefaultValueSql("GETUTCDATE()");
-
-                    b.Property<int?>("TrainingDays")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime2")
-                        .HasDefaultValueSql("GETUTCDATE()");
-
-                    b.HasKey("TrainingSubmissionID");
-
-                    b.HasIndex("ApplicationID");
-
-                    b.HasIndex("ReviewedByAdminId");
-
-                    b.HasIndex("Status");
-
-                    b.HasIndex("StudentID");
-
-                    b.HasIndex("SubmittedAt");
-
-                    b.ToTable("TrainingSubmissions", (string)null);
-                });
-
             modelBuilder.Entity("Sh8lny.Domain.Models.Transaction", b =>
                 {
                     b.Property<int>("Id")
@@ -2689,32 +2560,6 @@ namespace Sh8lny.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("Skill");
-
-                    b.Navigation("Student");
-                });
-
-            modelBuilder.Entity("Sh8lny.Domain.Models.TrainingSubmission", b =>
-                {
-                    b.HasOne("Sh8lny.Domain.Models.Application", "Application")
-                        .WithMany()
-                        .HasForeignKey("ApplicationID")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("Sh8lny.Domain.Models.User", "ReviewedByAdmin")
-                        .WithMany()
-                        .HasForeignKey("ReviewedByAdminId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("Sh8lny.Domain.Models.Student", "Student")
-                        .WithMany()
-                        .HasForeignKey("StudentID")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Application");
-
-                    b.Navigation("ReviewedByAdmin");
 
                     b.Navigation("Student");
                 });

@@ -42,6 +42,9 @@ namespace Sh8lny.Persistence.Configurations
             builder.Property(u => u.VerificationCode)
                 .HasMaxLength(10);
 
+            builder.Property(u => u.FcmToken)
+                .HasMaxLength(512);
+
             builder.Property(u => u.CreatedAt)
                 .HasDefaultValueSql("GETDATE()");
 

@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Sh8lny.Abstraction.Services;
+using Sh8lny.Shared.DTOs.Maintenance;
 
 namespace Sh8lny.Web.Controllers
 {
@@ -10,11 +11,16 @@ namespace Sh8lny.Web.Controllers
     public class MaintenanceController : ControllerBase
     {
         private readonly IBackupService _backupService;
+        private readonly IMaintenanceService _maintenanceService;
         private readonly ILogger<MaintenanceController> _logger;
 
-        public MaintenanceController(IBackupService backupService, ILogger<MaintenanceController> logger)
+        public MaintenanceController(
+            IBackupService backupService,
+            IMaintenanceService maintenanceService,
+            ILogger<MaintenanceController> logger)
         {
             _backupService = backupService;
+            _maintenanceService = maintenanceService;
             _logger = logger;
         }
 
@@ -60,6 +66,39 @@ namespace Sh8lny.Web.Controllers
 
             var deleted = await _backupService.PurgeOldBackupsAsync(retentionDays);
             return Ok(new { Message = $"Purged {deleted} expired backup(s).", DeletedCount = deleted });
+        }
+
+        // ==================== App Configuration ====================
+
+        /// <summary>
+        /// Returns the current app configuration (maintenance mode, min version).
+        /// Public endpoint — no authentication required (mobile reads this on startup).
+        /// </summary>
+        [AllowAnonymous]
+        [HttpGet("config")]
+        public async Task<ActionResult<AppConfigDto>> GetAppConfig()
+        {
+            var result = await _maintenanceService.GetAppConfigAsync();
+
+            if (!result.IsSuccess)
+                return StatusCode(500, result);
+
+            return Ok(result.Data);
+        }
+
+        /// <summary>
+        /// Updates the app configuration. Admin only.
+        /// </summary>
+        [Authorize(Roles = "Admin")]
+        [HttpPut("config")]
+        public async Task<IActionResult> UpdateAppConfig([FromBody] UpdateAppConfigDto dto)
+        {
+            var result = await _maintenanceService.UpdateAppConfigAsync(dto);
+
+            if (!result.IsSuccess)
+                return BadRequest(result);
+
+            return Ok(result);
         }
     }
 }

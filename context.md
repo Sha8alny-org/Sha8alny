@@ -86,7 +86,7 @@ Sh8lnySolution.sln
 │   └── Sh8lny.Presentation/           ← (Reserved — currently minimal)
 │
 ├── Sh8lny.Web/                        ← COMPOSITION ROOT (API Host)
-│   ├── Controllers/                   ← 16 API Controllers
+│   ├── Controllers/                   ← 17 API Controllers
 │   ├── Hubs/                          ← SignalR Hub(s)
 │   ├── Services/                      ← Web-layer services (SignalRNotifier, BackupWorker)
 │   ├── Mappings/                      ← AutoMapper profiles
@@ -159,6 +159,15 @@ builder.Services.AddScoped<INotifier, SignalRNotifier>();
 // Background services
 builder.Services.AddScoped<IBackupService, BackupService>();
 builder.Services.AddHostedService<BackupWorker>();
+
+// Field Training
+builder.Services.AddScoped<ITrainingSubmissionService, TrainingSubmissionService>();
+
+// App Configuration (Maintenance)
+builder.Services.AddScoped<IMaintenanceService, MaintenanceService>();
+
+// Announcements
+builder.Services.AddScoped<IAnnouncementService, AnnouncementService>();
 ```
 
 ### Middleware Pipeline Order
@@ -202,6 +211,7 @@ Project (1) ──→ (N) CompletedOpportunity
 Project (1) ──→ (N) SavedOpportunity
 
 Application (1) ──→ (N) ApplicationModuleProgress
+Application (1) ──→ (N) TrainingSubmission
 
 Student (1) ──→ (N) Application
 Student (1) ──→ (N) StudentSkill
@@ -214,6 +224,7 @@ Student (1) ──→ (N) CompletedOpportunity
 Student (1) ──→ (N) CompanyReview (written by student)
 Student (1) ──→ (N) StudentReview (received from company)
 Student (1) ──→ (N) SavedOpportunity
+Student (1) ──→ (N) TrainingSubmission
 
 Conversation (1) ──→ (N) Message
 Conversation (1) ──→ (N) ConversationParticipant
@@ -235,6 +246,7 @@ Conversation (1) ──→ (N) ConversationParticipant
 | `VerificationCodeExpiry` | `DateTime?`  | Expiration for verification code          |
 | `PasswordResetToken`     | `string?`    | Token for forgot-password flow            |
 | `ResetTokenExpires`      | `DateTime?`  | Expiration for reset token                |
+| `FcmToken`               | `string?`    | FCM push notification device token         |
 | `IsActive`               | `bool`       | Default `true`; can be banned/deactivated |
 | `CreatedAt`              | `DateTime`   |                                           |
 | `LastLoginAt`            | `DateTime?`  |                                           |
@@ -409,6 +421,16 @@ Conversation (1) ──→ (N) ConversationParticipant
 
 **Navigation:** `Project`, `Student`, `Company?`
 
+#### `AppConfig` (Singleton — App-Wide Configuration)
+| Property              | Type         | Notes                                    |
+|-----------------------|--------------|------------------------------------------|
+| `Id`                  | `int` (PK)   | Always 1 (singleton row)                 |
+| `IsMaintenanceMode`   | `bool`       | When true, mobile blocks entry           |
+| `MaintenanceTitle`    | `string`     | Title shown on maintenance screen        |
+| `MaintenanceMessage`  | `string`     | Body text on maintenance screen          |
+| `MinSupportedVersion` | `string`     | Semver (e.g. "1.0.0") — mobile version gate |
+| `UpdatedAt`           | `DateTime`   | Last update timestamp                    |
+
 #### `Transaction`
 | Property          | Type        | Notes                                    |
 |-------------------|-------------|------------------------------------------|
@@ -419,6 +441,49 @@ Conversation (1) ──→ (N) ConversationParticipant
 | `Amount`          | `decimal`   |                                          |
 | `TransactionDate` | `DateTime`  |                                          |
 | `PaymentMethod`   | `string`    | e.g., "Credit Card", "Visa", "Wallet"    |
+
+#### `TrainingSubmission` (Field Training Document Submission)
+| Property              | Type                      | Notes                                    |
+|-----------------------|---------------------------|------------------------------------------|
+| `TrainingSubmissionID`| `int` (PK)                | Auto-increment                           |
+| `ApplicationID`       | `int` (FK → Application)  | Associated application                   |
+| `StudentID`           | `int` (FK → Student)      | Submitting student                       |
+| `CertificateUrl`      | `string?`                 | Training certificate document URL        |
+| `ReportUrl`           | `string?`                 | Detailed training report URL             |
+| `PresentationUrl`     | `string?`                 | Presentation document URL                |
+| `CompanyEvaluationUrl`| `string?`                 | Company evaluation form URL              |
+| `StudentSurveyUrl`    | `string?`                 | Student field training survey URL        |
+| `Status`              | `TrainingSubmissionStatus`| See enum below                           |
+| `IsAdminApproved`     | `bool`                    | Admin academic approval                  |
+| `IsCompanyVerified`   | `bool`                    | Company industry verification            |
+| `TrainingDays`        | `int?`                    | Days to credit on full completion        |
+| `AdminNotes`          | `string?`                 | Admin reviewer notes                     |
+| `RejectionReason`     | `string?`                 | Reason for rejection                     |
+| `ReviewedByAdminId`   | `int?` (FK → User)        | Admin who reviewed                       |
+| `AdminReviewedAt`     | `DateTime?`               | When admin reviewed                      |
+| `CompanyVerifiedAt`   | `DateTime?`               | When company verified                    |
+| `CompletedAt`         | `DateTime?`               | When fully completed                     |
+| `SubmittedAt`         | `DateTime`                | Creation timestamp                       |
+| `UpdatedAt`           | `DateTime`                | Last update timestamp                    |
+
+**TrainingSubmissionStatus enum:** `Pending`, `AdminApproved`, `CompanyVerified`, `FullyCompleted`, `Rejected`
+
+**Navigation:** `Application`, `Student`, `ReviewedByAdmin` (User)
+
+**Workflow:** Student submits documents → Admin reviews (approve/reject) → Company verifies → If both approved: Status = FullyCompleted, Student.TotalInternshipDays incremented
+
+#### `Announcement` (Platform-Wide Announcement)
+| Property      | Type        | Notes                                    |
+|---------------|-------------|------------------------------------------|
+| `Id`          | `int` (PK)  | Auto-increment                           |
+| `Title`       | `string`    | Required, max 200                        |
+| `Description` | `string`    | Required, max 2000                       |
+| `ImageUrl`    | `string?`   | Optional, max 1000                       |
+| `Link`        | `string?`   | Optional, max 1000                       |
+| `CreatedAt`   | `DateTime`  | Creation timestamp                       |
+| `UpdatedAt`   | `DateTime?` | Last update timestamp                    |
+
+**Access:** `GET /api/Announcements` is public (AllowAnonymous). Create/update/delete require Admin role.
 
 #### `Certificate`
 | Property           | Type        | Notes                                    |
@@ -557,6 +622,7 @@ Conversation (1) ──→ (N) ConversationParticipant
 | `DashboardMetric`          | Daily platform-wide statistics snapshot                |
 | `UserSettings`             | User preferences (notifications, language, privacy)    |
 | `CompletedOpportunity`     | Historical record of finished jobs/internships         |
+| `AppConfig`                | Singleton: maintenance mode, min version gate          |
 
 ### Migration History
 
@@ -570,6 +636,8 @@ Conversation (1) ──→ (N) ConversationParticipant
 | `20260329161809_AddInternshipDays`                         | 2026-03-29   | `TotalInternshipDays` on Student               |
 | `20260422183336_SyncPendingModelChanges`                   | 2026-04-22   | Sync pending model changes                     |
 | `20260423130812_AddSavedProjectsAndReviews`                | 2026-04-23   | `SavedOpportunity`, `StudentReview`, `CompanyReview` tables |
+| `AddFcmTokenToUser`                                       | Pending      | `FcmToken` column on `User` table                         |
+| `AddAppConfig`                                            | Pending      | `AppConfigs` table for maintenance/version config          |
 
 ### Recent Architectural Changes (Verified in Codebase)
 
@@ -594,6 +662,8 @@ Conversation (1) ──→ (N) ConversationParticipant
 | `/api/Auth/forgot-password`    | POST   | Public  | Send password reset code via email             |
 | `/api/Auth/reset-password`     | POST   | Public  | Reset password with token                      |
 | `/api/Auth/verify-email`       | POST   | Public  | Verify email with OTP code                     |
+| `/api/Auth/fcm-token`          | PUT    | Auth    | Update FCM push notification device token       |
+| `/api/Auth/change-password`    | POST   | Auth    | Change password for authenticated user          |
 
 **JWT Configuration:**
 - Issuer: `Sha8alny`
@@ -667,10 +737,25 @@ Conversation (1) ──→ (N) ConversationParticipant
 | `/api/Chat/conversations`        | GET    | Auth | Get all conversations for current user         |
 | `/api/Chat/conversations/{id}`   | GET    | Auth | Get conversation with messages                 |
 | `/api/Chat/conversations/{id}/messages` | GET | Auth | Get paginated messages for a conversation |
+| `/api/Chat/conversations/{id}/read` | PUT  | Auth | Mark conversation as read                      |
+
+**Note:** `POST /api/Chat/send` accepts a `ReceiverId` and **automatically finds or creates**
+a Direct conversation between the two users. There is no need for a separate "create conversation"
+endpoint — just send the first message to any `ReceiverId`.
 
 **Note:** Chat is currently REST-based. Real-time delivery via SignalR is partially implemented (see Section 5).
 
-### 4.8 Notifications (`/api/Notifications`)
+### 4.8 User Search (`/api/users`)
+
+| Endpoint                         | Method | Auth | Description                              |
+|----------------------------------|--------|------|------------------------------------------|
+| `/api/users/search`             | GET    | Auth | Search users by name/email (for chat)   |
+
+**Query parameters:** `query` (string, min 2 chars), `excludeSelf` (bool, default true).
+Returns top 20 results with `UserId`, `FullName`, `UserType`, `ProfilePictureUrl`.
+Searches across Students (by name), Companies (by name), and all Users (by email).
+
+### 4.9 Notifications (`/api/Notifications`)
 
 | Endpoint                              | Method | Auth | Description                              |
 |---------------------------------------|--------|------|------------------------------------------|
@@ -679,7 +764,7 @@ Conversation (1) ──→ (N) ConversationParticipant
 | `/api/Notifications/{id}/read`        | PUT    | Auth | Mark notification as read                |
 | `/api/Notifications/read-all`         | PUT    | Auth | Mark all notifications as read           |
 
-### 4.9 Reviews (`/api/Reviews`)
+### 4.10 Reviews (`/api/Reviews`)
 
 | Endpoint                         | Method | Auth    | Description                              |
 |----------------------------------|--------|---------|------------------------------------------|
@@ -690,14 +775,14 @@ Conversation (1) ──→ (N) ConversationParticipant
 
 **Review statuses:** `Approved` / `Rejected` — Company feedback is supported.
 
-### 4.10 Certificates (`/api/Certificates`)
+### 4.11 Certificates (`/api/Certificates`)
 
 | Endpoint                              | Method | Auth    | Description                              |
 |---------------------------------------|--------|---------|------------------------------------------|
 | `/api/Certificates/my-certificates`   | GET    | Student | Get all certificates for current student |
 | `/api/Certificates/verify/{uniqueId}` | GET    | Public  | Verify a certificate by unique ID        |
 
-### 4.11 Payments (`/api/Payments`)
+### 4.12 Payments (`/api/Payments`)
 
 | Endpoint                         | Method | Auth    | Description                              |
 |----------------------------------|--------|---------|------------------------------------------|
@@ -707,7 +792,7 @@ Conversation (1) ──→ (N) ConversationParticipant
 
 **Payment Gateway:** Paymob integration (Order Registration + Webhook flow). `PaymentMethod` supports `Card`, `Wallet`, `Kiosk`.
 
-### 4.12 Media / File Uploads (`/api/Media`)
+### 4.13 Media / File Uploads (`/api/Media`)
 
 | Endpoint                          | Method | Auth | Description                              |
 |-----------------------------------|--------|------|------------------------------------------|
@@ -728,7 +813,7 @@ Conversation (1) ──→ (N) ConversationParticipant
 - Thumbnails (300px) are generated for images.
 - Virus scanning via ClamAV is **currently disabled** (stub always returns `true`).
 
-### 4.13 Master Data (`/api/MasterData`)
+### 4.14 Master Data (`/api/MasterData`)
 
 | Endpoint                         | Method | Auth | Description                              |
 |----------------------------------|--------|------|------------------------------------------|
@@ -739,7 +824,7 @@ Conversation (1) ──→ (N) ConversationParticipant
 | `/api/MasterData/universities`   | GET    | Public | List all universities                   |
 | `/api/MasterData/departments`    | GET    | Public | List all departments                    |
 
-### 4.14 Admin Dashboard (`/api/Admin`)
+### 4.15 Admin Dashboard (`/api/Admin`)
 
 | Endpoint                         | Method | Auth  | Description                              |
 |----------------------------------|--------|-------|------------------------------------------|
@@ -749,20 +834,51 @@ Conversation (1) ──→ (N) ConversationParticipant
 | `/api/Admin/users/{id}/activate` | PUT    | Admin | Activate a banned user                   |
 | `/api/Admin/metrics`             | GET    | Admin | Get historical dashboard metrics         |
 
-### 4.15 User Settings (`/api/Settings`)
+### 4.16 User Settings (`/api/Settings`)
 
 | Endpoint                         | Method | Auth | Description                              |
 |----------------------------------|--------|------|------------------------------------------|
 | `/api/Settings`                  | GET    | Auth | Get current user's settings              |
 | `/api/Settings`                  | PUT    | Auth | Update user settings                     |
 
-### 4.16 Maintenance (`/api/Maintenance`)
+### 4.17 Maintenance (`/api/Maintenance`)
 
 | Endpoint                         | Method | Auth  | Description                              |
 |----------------------------------|--------|-------|------------------------------------------|
 | `/api/Maintenance/backup`        | POST   | Admin | Trigger on-demand database backup        |
+| `/api/Maintenance/config`        | GET    | Public | Get app configuration (maintenance, version) |
+| `/api/Maintenance/config`        | PUT    | Admin  | Update app configuration                 |
 
-### 4.17 Real-time (SignalR)
+### 4.18 Field Training Submissions (`/api/TrainingSubmissions`)
+
+| Endpoint                                          | Method | Auth           | Description                                    |
+|---------------------------------------------------|--------|----------------|------------------------------------------------|
+| `/api/TrainingSubmissions`                        | POST   | Student        | Submit training documents (URLs from /api/Media) |
+| `/api/TrainingSubmissions/{id}`                   | GET    | Auth           | Get submission status                          |
+| `/api/TrainingSubmissions/my`                     | GET    | Student        | Student's own submissions                      |
+| `/api/TrainingSubmissions/{id}/admin-review`      | PUT    | Admin/University | Admin academic approval (approve/reject)       |
+| `/api/TrainingSubmissions/{id}/company-verify`    | PUT    | Company        | Company industry verification                  |
+| `/api/TrainingSubmissions/pending-admin`          | GET    | Admin/University | Admin review queue                            |
+| `/api/TrainingSubmissions/pending-company`        | GET    | Company        | Company verify queue                           |
+
+**Dual-Approval Workflow:**
+1. Student submits training documents → Status = `Pending`
+2. Admin reviews → If approved: Status = `AdminApproved`, If rejected: Status = `Rejected`
+3. Company verifies → Status = `CompanyVerified`
+4. If both Admin approved AND Company verified → Status = `FullyCompleted`, Student.TotalInternshipDays incremented
+
+### 4.19 Announcements (`/api/Announcements`)
+
+| Endpoint                      | Method | Auth    | Description                              |
+|-------------------------------|--------|---------|------------------------------------------|
+| `/api/Announcements`          | GET    | Public  | Get all announcements (newest first)     |
+| `/api/Announcements`          | POST   | Admin   | Create a new announcement                |
+| `/api/Announcements/{id}`     | PUT    | Admin   | Update an existing announcement          |
+| `/api/Announcements/{id}`     | DELETE | Admin   | Delete an announcement                   |
+
+**Note:** `GET /api/Announcements` is `AllowAnonymous` — the mobile home screen reads this without authentication.
+
+### 4.20 Real-time (SignalR)
 
 | Hub Endpoint                | Auth | Events                                        |
 |-----------------------------|------|-----------------------------------------------|
@@ -775,7 +891,7 @@ Conversation (1) ──→ (N) ConversationParticipant
 - Methods: `SendNotificationAsync`, `SendNotificationToManyAsync`, `SendMessageToUserAsync`
 - Failure in real-time delivery is **non-blocking** (logged, not thrown)
 
-### 4.18 Infrastructure
+### 4.20 Infrastructure
 
 | Feature                  | Status   | Details                                        |
 |--------------------------|----------|------------------------------------------------|
@@ -794,16 +910,15 @@ Conversation (1) ──→ (N) ConversationParticipant
 ### 5.1 Real-time Chat & Notifications Upgrade
 
 **Current State:**
-- Chat is REST-based (HTTP request/response).
-- `NotificationHub` exists and is mapped at `/hubs/notifications`.
-- `SignalRNotifier` is registered and implements `INotifier`.
-- SignalR JWT auth is configured (reads `access_token` from query string).
+- Chat messages are sent via REST (`POST /api/Chat/send`) and **immediately pushed to the receiver via SignalR**.
+- `NotificationHub` exists at `/hubs/notifications` and handles both `ReceiveNotification` and `ReceiveMessage` events.
+- `SignalRNotifier` implements `INotifier` with `SendMessageToUserAsync` — called from `ChatService.SendMessageAsync` after DB save.
+- SignalR JWT auth reads `access_token` from query string for WebSocket connections.
+- Mobile connects to `/hubs/notifications` and listens for `ReceiveMessage` events.
 
-**What's Missing:**
-- A dedicated `ChatHub` for real-time message delivery.
+**What's Still Missing:**
 - Typing indicators, read receipts, online presence.
-- Replacing REST chat endpoints with SignalR-based real-time flow.
-- Push notification integration for mobile (FCM/APNs).
+- Push notification integration for mobile (FCM/APNs) for offline users.
 
 ### 5.2 CI/CD Pipeline
 
@@ -855,7 +970,7 @@ Conversation (1) ──→ (N) ConversationParticipant
 
 | Feature                        | Status          | Notes                                        |
 |--------------------------------|-----------------|----------------------------------------------|
-| Password change (authenticated)| Not implemented | Only forgot-password flow exists             |
+| Password change (authenticated)| ✅ Implemented | `POST /api/Auth/change-password`                |
 | Profile picture cropping       | Not implemented | Resize exists, no client-side crop           |
 | File type expansion            | Partial         | Only `.jpg/.jpeg/.png/.gif/.pdf` allowed     |
 | Email templates                | Not implemented | Plain text emails only                       |
@@ -1074,6 +1189,8 @@ Sh8lnySolution.sln
 │   │   ├── Sh8lny.Domain.csproj
 │   │   └── Models/
 │   │       ├── ActivityLog.cs
+│   │       ├── Announcement.cs
+│   │       ├── AppConfig.cs
 │   │       ├── Application.cs
 │   │       ├── ApplicationModuleProgress.cs
 │   │       ├── Certificate.cs
@@ -1111,6 +1228,7 @@ Sh8lnySolution.sln
 │   │   │   └── IUnitOfWork.cs
 │   │   └── Services/
 │   │       ├── IAdminService.cs
+│   │       ├── IAnnouncementService.cs
 │   │       ├── IApplicationService.cs
 │   │       ├── IAuthService.cs
 │   │       ├── IBackupService.cs
@@ -1133,6 +1251,7 @@ Sh8lnySolution.sln
 │   └── Sh8lny.Service/
 │       ├── Sh8lny.Service.csproj
 │       ├── AdminService.cs
+│       ├── AnnouncementService.cs
 │       ├── ApplicationService.cs
 │       ├── AuthService.cs
 │       ├── CertificateService.cs
@@ -1170,6 +1289,7 @@ Sh8lnySolution.sln
 ├── Sh8lny.Shared/
 │   ├── Sh8lny.Shared.csproj
 │   ├── DTOs/
+│   │   ├── Announcements/
 │   │   ├── Admin/
 │   │   ├── Applications/
 │   │   ├── Auth/

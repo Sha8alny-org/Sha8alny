@@ -105,4 +105,54 @@ public class AuthController : ControllerBase
 
         return Ok(new { Message = result.Data });
     }
+
+    /// <summary>
+    /// Updates the authenticated user's FCM push notification device token.
+    /// </summary>
+    /// <param name="dto">The new FCM token.</param>
+    /// <returns>Success or failure response.</returns>
+    [Authorize]
+    [HttpPut("fcm-token")]
+    public async Task<IActionResult> UpdateFcmToken([FromBody] UpdateFcmTokenDto dto)
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                       ?? User.FindFirst("sub")?.Value;
+
+        if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out var userId))
+        {
+            return Unauthorized(new { Message = "Invalid or missing user token." });
+        }
+
+        var result = await _authService.UpdateFcmTokenAsync(userId, dto.FcmToken);
+
+        if (!result.IsSuccess)
+            return BadRequest(result);
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Changes the authenticated user's password.
+    /// </summary>
+    /// <param name="dto">Current password, new password, and confirmation.</param>
+    /// <returns>Success or failure response.</returns>
+    [Authorize]
+    [HttpPost("change-password")]
+    public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDto dto)
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                       ?? User.FindFirst("sub")?.Value;
+
+        if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out var userId))
+        {
+            return Unauthorized(new { Message = "Invalid or missing user token." });
+        }
+
+        var result = await _authService.ChangePasswordAsync(userId, dto);
+
+        if (!result.IsSuccess)
+            return BadRequest(result);
+
+        return Ok(result);
+    }
 }

@@ -172,6 +172,15 @@ namespace Sh8lny.Web
             builder.Services.AddScoped<IBackupService, BackupService>();
             builder.Services.AddHostedService<BackupWorker>();
 
+            // App Configuration (Maintenance)
+            builder.Services.AddScoped<IMaintenanceService, MaintenanceService>();
+
+            // Announcements
+            builder.Services.AddScoped<IAnnouncementService, AnnouncementService>();
+
+            // Field Training Submissions
+            builder.Services.AddScoped<ITrainingSubmissionService, TrainingSubmissionService>();
+
             var app = builder.Build();
 
             // Apply pending migrations and seed database with demo data

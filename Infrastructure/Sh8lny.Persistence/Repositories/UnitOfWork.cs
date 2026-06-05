@@ -41,6 +41,9 @@ namespace Sh8lny.Persistence.Repositories
         private IGenericRepository<StudentReview>? _studentReviews;
         private IGenericRepository<SavedOpportunity>? _savedOpportunities;
         private IGenericRepository<Transaction>? _transactions;
+        private IGenericRepository<AppConfig>? _appConfigs;
+        private IGenericRepository<TrainingSubmission>? _trainingSubmissions;
+        private IGenericRepository<Announcement>? _announcements;
 
         public UnitOfWork(Sha8lnyDbContext context)
         {
@@ -135,6 +138,15 @@ namespace Sh8lny.Persistence.Repositories
 
         public IGenericRepository<Transaction> Transactions =>
             _transactions ??= new GenericRepository<Transaction>(_context);
+
+        public IGenericRepository<AppConfig> AppConfigs =>
+            _appConfigs ??= new GenericRepository<AppConfig>(_context);
+
+        public IGenericRepository<TrainingSubmission> TrainingSubmissions =>
+            _trainingSubmissions ??= new GenericRepository<TrainingSubmission>(_context);
+
+        public IGenericRepository<Announcement> Announcements =>
+            _announcements ??= new GenericRepository<Announcement>(_context);
 
         public async Task<int> SaveAsync()
         {
