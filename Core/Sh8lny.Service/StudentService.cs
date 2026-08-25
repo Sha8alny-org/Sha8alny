@@ -55,6 +55,19 @@ public class StudentService : IStudentService
                 ProfilePicture = dto.ProfilePicture,
                 GitHubProfile = dto.GitHubProfile,
                 CvFileUrl = dto.CvFileUrl,
+                UniversityID = dto.UniversityID,
+                DepartmentID = dto.DepartmentID,
+                AcademicYear = dto.AcademicYear.HasValue
+                    ? dto.AcademicYear.Value switch
+                    {
+                        Shared.DTOs.StudentProfile.AcademicYearDto.FirstYear => Domain.Models.AcademicYear.FirstYear,
+                        Shared.DTOs.StudentProfile.AcademicYearDto.SecondYear => Domain.Models.AcademicYear.SecondYear,
+                        Shared.DTOs.StudentProfile.AcademicYearDto.ThirdYear => Domain.Models.AcademicYear.ThirdYear,
+                        Shared.DTOs.StudentProfile.AcademicYearDto.FourthYear => Domain.Models.AcademicYear.FourthYear,
+                        Shared.DTOs.StudentProfile.AcademicYearDto.Graduate => Domain.Models.AcademicYear.Graduate,
+                        _ => null
+                    }
+                    : null,
                 City = dto.City,
                 State = dto.State,
                 Country = dto.Country,
@@ -64,6 +77,14 @@ public class StudentService : IStudentService
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
+
+            // Auto-link university if UniversityID is null but we have university name in the first education record
+            if (student.UniversityID is null && dto.Educations.Count > 0)
+            {
+                var universityName = dto.Educations[0].UniversityName;
+                var match = await _unitOfWork.Universities.FindSingleAsync(u => u.UniversityName == universityName);
+                student.UniversityID = match?.UniversityID;
+            }
 
             await _unitOfWork.Students.AddAsync(student);
             await _unitOfWork.SaveAsync();
@@ -396,6 +417,7 @@ public class StudentService : IStudentService
                 ProfilePicture = student.ProfilePicture,
                 GitHubProfile = student.GitHubProfile,
                 UniversityID = student.UniversityID,
+                UniversityName = student.University?.UniversityName,
                 DepartmentID = student.DepartmentID,
                 DepartmentName = student.Department?.DepartmentName,
                 AcademicYear = student.AcademicYear?.ToString(),

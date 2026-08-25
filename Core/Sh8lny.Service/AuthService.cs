@@ -2,6 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 using Sh8lny.Abstraction.Repositories;
 using Sh8lny.Abstraction.Services;
@@ -21,12 +22,18 @@ public class AuthService : IAuthService
     private readonly IUnitOfWork _unitOfWork;
     private readonly JwtOptions _jwtOptions;
     private readonly IMailService _mailService;
+    private readonly ILogger<AuthService> _logger;
 
-    public AuthService(IUnitOfWork unitOfWork, IOptions<JwtOptions> jwtOptions, IMailService mailService)
+    public AuthService(
+        IUnitOfWork unitOfWork,
+        IOptions<JwtOptions> jwtOptions,
+        IMailService mailService,
+        ILogger<AuthService> logger)
     {
         _unitOfWork = unitOfWork;
         _jwtOptions = jwtOptions.Value;
         _mailService = mailService;
+        _logger = logger;
     }
 
     /// <inheritdoc />
@@ -62,6 +69,8 @@ public class AuthService : IAuthService
             Email = dto.Email,
             PasswordHash = passwordHash,
             UserType = userType,
+            FirstName = dto.FirstName,
+            LastName = dto.LastName,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -80,6 +89,8 @@ public class AuthService : IAuthService
             UserId = user.UserID,
             Email = user.Email,
             Role = user.UserType.ToString(),
+            FirstName = user.FirstName,
+            LastName = user.LastName,
             Message = "Registration successful."
         };
     }
@@ -113,6 +124,25 @@ public class AuthService : IAuthService
         _unitOfWork.Users.Update(user);
         await _unitOfWork.SaveAsync();
 
+        // Fallback for FirstName/LastName if they are null/empty on User
+        var firstName = user.FirstName;
+        var lastName = user.LastName;
+        if (string.IsNullOrEmpty(firstName))
+        {
+            if (user.UserType == UserType.Student)
+            {
+                var student = await _unitOfWork.Students.FindSingleAsync(s => s.UserID == user.UserID);
+                firstName = student?.FirstName;
+                lastName = student?.LastName;
+            }
+            else if (user.UserType == UserType.Company)
+            {
+                var company = await _unitOfWork.Companies.FindSingleAsync(c => c.UserID == user.UserID);
+                firstName = company?.CompanyName;
+                lastName = string.Empty;
+            }
+        }
+
         // Generate JWT token
         var (token, expiration) = GenerateJwtToken(user);
 
@@ -124,6 +154,8 @@ public class AuthService : IAuthService
             UserId = user.UserID,
             Email = user.Email,
             Role = user.UserType.ToString(),
+            FirstName = firstName,
+            LastName = lastName,
             Message = "Login successful."
         };
     }
@@ -247,7 +279,14 @@ public class AuthService : IAuthService
                 <p style='color: #888; font-size: 12px;'>If you did not request this, please ignore this email.</p>
             </div>";
 
-        await _mailService.SendEmailAsync(user.Email, "Sha8alny - Password Reset Code", htmlBody);
+        try
+        {
+            await _mailService.SendEmailAsync(user.Email, "Sha8alny - Password Reset Code", htmlBody);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error sending password reset email to {Email}", user.Email);
+        }
 
         return ServiceResponse<string>.Success("If an account with that email exists, a reset code has been sent.");
     }

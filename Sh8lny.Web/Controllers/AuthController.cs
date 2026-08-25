@@ -89,6 +89,10 @@ public class AuthController : ControllerBase
     public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordDto dto)
     {
         var result = await _authService.ForgotPasswordAsync(dto.Email);
+        if (!result.IsSuccess)
+        {
+            return BadRequest(new { Message = result.Message });
+        }
         return Ok(new { Message = result.Data });
     }
 

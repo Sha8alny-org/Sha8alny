@@ -191,6 +191,7 @@ namespace Sh8lny.Persistence.Repositories
                 .Include(s => s.Educations)
                 .Include(s => s.Experiences)
                 .Include(s => s.Department)
+                .Include(s => s.University)
                 .FirstOrDefaultAsync(s => s.UserID == userId);
         }
 

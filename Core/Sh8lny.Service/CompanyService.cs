@@ -270,4 +270,47 @@ public class CompanyService : ICompanyService
                 new List<string> { ex.Message });
         }
     }
+
+    /// <inheritdoc />
+    public async Task<ServiceResponse<CompanyDto>> GetProfileByCompanyIdAsync(int companyId)
+    {
+        try
+        {
+            var company = await _unitOfWork.Companies.GetByIdAsync(companyId);
+
+            if (company is null)
+            {
+                return ServiceResponse<CompanyDto>.Failure("Company profile not found.");
+            }
+
+            var companyDto = new CompanyDto
+            {
+                Id = company.CompanyID,
+                UserId = company.UserID,
+                CompanyName = company.CompanyName,
+                Description = company.Description,
+                Industry = company.Industry,
+                LogoUrl = company.CompanyLogo,
+                ContactEmail = company.ContactEmail,
+                ContactPhone = company.ContactPhone,
+                WebsiteUrl = company.Website,
+                Address = company.Address,
+                City = company.City,
+                State = company.State,
+                Country = company.Country,
+                AverageRating = company.AverageRating,
+                TotalReviews = company.TotalReviews,
+                CreatedAt = company.CreatedAt,
+                UpdatedAt = company.UpdatedAt
+            };
+
+            return ServiceResponse<CompanyDto>.Success(companyDto);
+        }
+        catch (Exception ex)
+        {
+            return ServiceResponse<CompanyDto>.Failure("An error occurred while retrieving the company profile.",
+                new List<string> { ex.Message });
+        }
+    }
 }
+

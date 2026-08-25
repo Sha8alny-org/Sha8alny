@@ -27,6 +27,12 @@ public class TrainingSubmissionService : ITrainingSubmissionService
     {
         try
         {
+            var student = await _unitOfWork.Students.FindSingleAsync(s => s.UserID == studentId);
+            if (student == null)
+            {
+                return ServiceResponse<TrainingSubmissionResponseDto>.Failure("Student profile not found.");
+            }
+
             // Validate that the application exists and belongs to the student
             var application = await _unitOfWork.Applications.GetByIdAsync(dto.ApplicationID);
             if (application == null)
@@ -34,7 +40,7 @@ public class TrainingSubmissionService : ITrainingSubmissionService
                 return ServiceResponse<TrainingSubmissionResponseDto>.Failure("Application not found.");
             }
 
-            if (application.StudentID != studentId)
+            if (application.StudentID != student.StudentID)
             {
                 return ServiceResponse<TrainingSubmissionResponseDto>.Failure("You can only submit training documents for your own applications.");
             }
@@ -43,7 +49,7 @@ public class TrainingSubmissionService : ITrainingSubmissionService
             var submission = new TrainingSubmission
             {
                 ApplicationID = dto.ApplicationID,
-                StudentID = studentId,
+                StudentID = student.StudentID,
                 CertificateUrl = dto.CertificateUrl,
                 ReportUrl = dto.ReportUrl,
                 PresentationUrl = dto.PresentationUrl,
@@ -150,8 +156,14 @@ public class TrainingSubmissionService : ITrainingSubmissionService
                 return ServiceResponse<TrainingSubmissionResponseDto>.Failure("Associated application not found.");
             }
 
+            var company = await _unitOfWork.Companies.FindSingleAsync(c => c.UserID == companyId);
+            if (company == null)
+            {
+                return ServiceResponse<TrainingSubmissionResponseDto>.Failure("Company profile not found.");
+            }
+
             var project = await _unitOfWork.Projects.GetByIdAsync(application.ProjectID);
-            if (project == null || project.CompanyID != companyId)
+            if (project == null || project.CompanyID != company.CompanyID)
             {
                 return ServiceResponse<TrainingSubmissionResponseDto>.Failure("You can only verify training submissions for your own company's projects.");
             }
@@ -220,7 +232,12 @@ public class TrainingSubmissionService : ITrainingSubmissionService
     {
         try
         {
-            var submissions = await _unitOfWork.TrainingSubmissions.FindAsync(ts => ts.StudentID == studentId);
+            var student = await _unitOfWork.Students.FindSingleAsync(s => s.UserID == studentId);
+            if (student == null)
+            {
+                return ServiceResponse<IEnumerable<TrainingSubmissionResponseDto>>.Failure("Student profile not found.");
+            }
+            var submissions = await _unitOfWork.TrainingSubmissions.FindAsync(ts => ts.StudentID == student.StudentID);
             var dtos = submissions.Select(MapToDto).ToList();
 
             return ServiceResponse<IEnumerable<TrainingSubmissionResponseDto>>.Success(dtos);

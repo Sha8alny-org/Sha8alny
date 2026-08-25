@@ -37,4 +37,12 @@ public interface ICompanyService
     /// <param name="searchDto">The search criteria.</param>
     /// <returns>Service response containing a paged list of company search results.</returns>
     Task<ServiceResponse<PagedResult<CompanySearchResultDto>>> SearchCompaniesAsync(CompanySearchDto searchDto);
+
+    /// <summary>
+    /// Gets the company profile by company ID.
+    /// </summary>
+    /// <param name="companyId">The ID of the company.</param>
+    /// <returns>Service response containing the company profile.</returns>
+    Task<ServiceResponse<CompanyDto>> GetProfileByCompanyIdAsync(int companyId);
 }
+

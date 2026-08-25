@@ -113,4 +113,24 @@ public class CompanyProfileController : ControllerBase
 
         return Ok(result);
     }
+
+    /// <summary>
+    /// Gets a company profile by company ID.
+    /// </summary>
+    /// <param name="id">The company ID.</param>
+    /// <returns>The company profile.</returns>
+    [HttpGet("{id:int}")]
+    [AllowAnonymous]
+    public async Task<ActionResult<ServiceResponse<CompanyDto>>> GetProfileById(int id)
+    {
+        var result = await _companyService.GetProfileByCompanyIdAsync(id);
+
+        if (!result.IsSuccess)
+        {
+            return NotFound(result);
+        }
+
+        return Ok(result);
+    }
 }
+

@@ -158,10 +158,12 @@ public class ApplicationService : IApplicationService
                 responseDtos.Add(new ApplicationResponseDto
                 {
                     Id = app.ApplicationID,
+                    ProjectId = app.ProjectID,
                     ProjectTitle = project?.ProjectName ?? "Unknown Project",
                     Status = app.Status.ToString(),
                     AppliedDate = app.AppliedAt,
-                    BidAmount = app.BidAmount ?? 0
+                    BidAmount = app.BidAmount ?? 0,
+                    StudentCvUrl = app.StudentCvUrl ?? app.Resume
                 });
             }
 

@@ -16,9 +16,7 @@ public class CreateStudentProfileDto
     public string? ProfilePicture { get; set; }
     public string? GitHubProfile { get; set; }
 
-    [Required]
-    [AllowedFileExtensions(".pdf", ".docx", ".pptx")]
-    public string CvFileUrl { get; set; } = string.Empty;
+    public string? CvFileUrl { get; set; }
     
     // Location
     [Required]
@@ -32,8 +30,6 @@ public class CreateStudentProfileDto
     [MinLength(1, ErrorMessage = "At least one education entry is required.")]
     public List<EducationDto> Educations { get; set; } = new();
 
-    [Required]
-    [MinLength(1, ErrorMessage = "At least one experience is required.")]
     public List<ExperienceDto> Experiences { get; set; } = new();
 
     // Skills (list of Skill IDs to link)
@@ -41,4 +37,8 @@ public class CreateStudentProfileDto
 
     // Internship Days (optional initial value)
     public int TotalInternshipDays { get; set; } = 0;
+
+    public AcademicYearDto? AcademicYear { get; set; }
+    public int? UniversityID { get; set; }
+    public int? DepartmentID { get; set; }
 }
