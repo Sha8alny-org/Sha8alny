@@ -52,13 +52,25 @@ public class ApplicationService : IApplicationService
                 return ServiceResponse<int>.Failure("This project is no longer accepting applications.");
             }
 
-            // 5. Check if max applicants reached
+            // 5. GPA eligibility check for training/internship opportunities
+            var isTrainingOpportunity = project.ProjectType == ProjectType.Training
+                                     || project.ProjectType == ProjectType.Internship;
+            if (isTrainingOpportunity
+                && project.IsGpaRequired
+                && project.MinimumGpa.HasValue
+                && (student.Gpa is null || student.Gpa < project.MinimumGpa.Value))
+            {
+                return ServiceResponse<int>.Failure(
+                    "Your GPA does not meet the minimum requirement for this training opportunity.");
+            }
+
+            // 6. Check if max applicants reached
             if (project.MaxApplicants.HasValue && project.ApplicationCount >= project.MaxApplicants.Value)
             {
                 return ServiceResponse<int>.Failure("This project has reached the maximum number of applicants.");
             }
 
-            // 6. Check for duplicate application
+            // 7. Check for duplicate application
             var existingApplication = await _unitOfWork.Applications
                 .FindSingleAsync(a => a.ProjectID == dto.ProjectId && a.StudentID == student.StudentID);
             if (existingApplication is not null)
@@ -66,7 +78,7 @@ public class ApplicationService : IApplicationService
                 return ServiceResponse<int>.Failure("You have already applied for this project.");
             }
 
-            // 7. Skill check - compare required skills vs student skills
+            // 8. Skill check - compare required skills vs student skills
             var requiredSkills = await _unitOfWork.ProjectRequiredSkills
                 .FindAsync(ps => ps.ProjectID == dto.ProjectId && ps.IsRequired);
             var studentSkills = await _unitOfWork.StudentSkills
@@ -426,5 +438,79 @@ public class ApplicationService : IApplicationService
             return ServiceResponse<bool>.Failure("An error occurred while withdrawing the application.",
                 new List<string> { ex.Message });
         }
+    }
+
+    /// <inheritdoc />
+    public async Task<ServiceResponse<IEnumerable<RankedApplicantDto>>> GetApplicantsRankedByGpaAsync(int userId, int projectId, int? count = null)
+    {
+        try
+        {
+            // 1. Verify project exists
+            var project = await _unitOfWork.Projects.GetByIdAsync(projectId);
+            if (project is null)
+            {
+                return ServiceResponse<IEnumerable<RankedApplicantDto>>.Failure("Project not found.");
+            }
+
+            // 2. Authorization: Admin or the company owning the project
+            var user = await _unitOfWork.Users.GetByIdAsync(userId);
+            if (user is null)
+            {
+                return ServiceResponse<IEnumerable<RankedApplicantDto>>.Failure("User not found.");
+            }
+
+            if (user.UserType != UserType.Admin)
+            {
+                var company = await _unitOfWork.Companies.FindSingleAsync(c => c.UserID == userId);
+                if (company is null || project.CompanyID != company.CompanyID)
+                {
+                    return ServiceResponse<IEnumerable<RankedApplicantDto>>.Failure(
+                        "You do not have permission to view the applicant ranking for this project.");
+                }
+            }
+
+            // 3. Get applications with student + academic details (eager load in Persistence layer)
+            var applications = await _unitOfWork.GetApplicationsWithStudentDetailsAsync(projectId);
+
+            // 4. Rank by GPA descending (applicants without GPA go last)
+            IEnumerable<Application> ranked = applications
+                .OrderByDescending(a => a.Student.Gpa.HasValue)
+                .ThenByDescending(a => a.Student.Gpa);
+
+            if (count.HasValue && count.Value > 0)
+            {
+                ranked = ranked.Take(count.Value);
+            }
+
+            var rankedDtos = ranked.Select(a => MapToRankedApplicantDto(a)).ToList();
+
+            return ServiceResponse<IEnumerable<RankedApplicantDto>>.Success(rankedDtos);
+        }
+        catch (Exception ex)
+        {
+            return ServiceResponse<IEnumerable<RankedApplicantDto>>.Failure(
+                "An error occurred while retrieving the applicant ranking.",
+                new List<string> { ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Maps an Application (with loaded Student details) to a RankedApplicantDto.
+    /// </summary>
+    private static RankedApplicantDto MapToRankedApplicantDto(Application application)
+    {
+        return new RankedApplicantDto
+        {
+            ApplicationId = application.ApplicationID,
+            StudentId = application.StudentID,
+            StudentName = application.Student?.FullName ?? "Unknown",
+            StudentTitle = application.Student?.Bio,
+            Gpa = application.Student?.Gpa,
+            UniversityName = application.Student?.University?.UniversityName,
+            DepartmentName = application.Student?.Department?.DepartmentName,
+            AcademicYear = application.Student?.AcademicYear?.ToString(),
+            Status = application.Status.ToString(),
+            AppliedDate = application.AppliedAt
+        };
     }
 }

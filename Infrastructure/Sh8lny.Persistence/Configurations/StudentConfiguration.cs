@@ -64,6 +64,9 @@ namespace Sh8lny.Persistence.Configurations
                 .HasConversion<string>()
                 .HasMaxLength(20);
 
+            builder.Property(s => s.Gpa)
+                .HasColumnType("decimal(4,2)");
+
             builder.Property(s => s.CreatedAt)
                 .HasDefaultValueSql("GETDATE()");
 
@@ -99,6 +102,9 @@ namespace Sh8lny.Persistence.Configurations
 
             builder.HasIndex(s => s.AverageRating)
                 .HasDatabaseName("IDX_Students_AverageRating");
+
+            builder.HasIndex(s => s.Gpa)
+                .HasDatabaseName("IDX_Students_Gpa");
 
             // Relationships
             builder.HasOne(s => s.University)

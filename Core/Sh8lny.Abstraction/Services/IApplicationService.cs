@@ -49,6 +49,16 @@ public interface IApplicationService
     Task<ServiceResponse<bool>> ReviewApplicationAsync(int companyUserId, ReviewApplicationDto dto);
 
     /// <summary>
+    /// Gets the applicants for a project ranked by GPA (highest first).
+    /// Only the company owning the project or an Admin may access this ranking.
+    /// </summary>
+    /// <param name="userId">The user ID of the requester (Company owner or Admin).</param>
+    /// <param name="projectId">The project ID.</param>
+    /// <param name="count">Optional limit for the top N applicants.</param>
+    /// <returns>Service response containing the ranked applicants.</returns>
+    Task<ServiceResponse<IEnumerable<RankedApplicantDto>>> GetApplicantsRankedByGpaAsync(int userId, int projectId, int? count = null);
+
+    /// <summary>
     /// Withdraws an application (student action).
     /// </summary>
     /// </summary>

@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Sh8lny.Abstraction.Services;
+using Sh8lny.Shared.DTOs.Applications;
 using Sh8lny.Shared.DTOs.Common;
 using Sh8lny.Shared.DTOs.Projects;
 
@@ -15,10 +16,12 @@ namespace Sh8lny.Web.Controllers;
 public class ProjectsController : ControllerBase
 {
     private readonly IProjectService _projectService;
+    private readonly IApplicationService _applicationService;
 
-    public ProjectsController(IProjectService projectService)
+    public ProjectsController(IProjectService projectService, IApplicationService applicationService)
     {
         _projectService = projectService;
+        _applicationService = applicationService;
     }
 
     /// <summary>
@@ -157,6 +160,36 @@ public class ProjectsController : ControllerBase
         [FromQuery] ProjectFilterDto filter)
     {
         var result = await _projectService.GetFilteredProjectsAsync(filter);
+
+        if (!result.IsSuccess)
+        {
+            return BadRequest(result);
+        }
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Gets the applicants for a project ranked by GPA (highest first).
+    /// </summary>
+    /// <param name="projectId">The project ID.</param>
+    /// <param name="count">Optional limit for the top N applicants.</param>
+    /// <returns>Ranked list of applicants.</returns>
+    /// <remarks>
+    /// Example: GET /api/projects/5/applicants/ranked-by-gpa?count=10
+    /// </remarks>
+    [HttpGet("{projectId}/applicants/ranked-by-gpa")]
+    [Authorize(Roles = "Company,Admin")]
+    public async Task<ActionResult<ServiceResponse<IEnumerable<RankedApplicantDto>>>> GetApplicantsRankedByGpa(
+        int projectId, [FromQuery] int? count)
+    {
+        var userId = GetCurrentUserId();
+        if (userId is null)
+        {
+            return Unauthorized(ServiceResponse<IEnumerable<RankedApplicantDto>>.Failure("Invalid or missing user token."));
+        }
+
+        var result = await _applicationService.GetApplicantsRankedByGpaAsync(userId.Value, projectId, count);
 
         if (!result.IsSuccess)
         {

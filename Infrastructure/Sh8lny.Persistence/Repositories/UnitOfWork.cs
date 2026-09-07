@@ -208,6 +208,17 @@ namespace Sh8lny.Persistence.Repositories
                 .ToListAsync();
         }
 
+        public async Task<List<Application>> GetApplicationsWithStudentDetailsAsync(int projectId)
+        {
+            return await _context.Applications
+                .Include(a => a.Student)
+                    .ThenInclude(s => s.University)
+                .Include(a => a.Student)
+                    .ThenInclude(s => s.Department)
+                .Where(a => a.ProjectID == projectId)
+                .ToListAsync();
+        }
+
         protected virtual void Dispose(bool disposing)
         {
             if (!_disposed && disposing)

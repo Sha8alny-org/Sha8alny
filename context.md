@@ -273,6 +273,7 @@ Conversation (1) ──→ (N) ConversationParticipant
 | `DepartmentID`          | `int?` (FK)       |                                          |
 | `AcademicYear`          | `AcademicYear?`   | Enum: `FirstYear` through `FifthYear`    |
 | `StudentIDNumber`       | `string?`         | University student ID                    |
+| `Gpa`                   | `decimal?`        | Nullable; `decimal(4,2)` precision; used for GPA-gated training opportunities and applicant ranking |
 | `City`                  | `string?`         |                                          |
 | `State`                 | `string?`         |                                          |
 | `Country`               | `string`          | Required                                 |
@@ -732,6 +733,7 @@ Conversation (1) ──→ (N) ConversationParticipant
 | `/api/Projects/{id}`             | GET    | Public  | Get project by ID                             |
 | `/api/Projects/search`           | GET    | Public  | Search/filter/sort/paginate projects           |
 | `/api/Projects/my-projects`      | GET    | Company | Get company's own projects                    |
+| `/api/Projects/{id}/applicants/ranked-by-gpa` | GET | Company(Owner)/Admin | Applicants ranked by GPA (`?count=` optional top-N) |
 
 ### 4.5 Application Flow (`/api/Applications`)
 

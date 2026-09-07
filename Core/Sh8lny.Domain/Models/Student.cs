@@ -28,6 +28,7 @@ namespace Sh8lny.Domain.Models
         public int? DepartmentID { get; set; }
         public AcademicYear? AcademicYear { get; set; }
         public string? StudentIDNumber { get; set; }
+        public decimal? Gpa { get; set; }
 
         // Location
         public string? City { get; set; }

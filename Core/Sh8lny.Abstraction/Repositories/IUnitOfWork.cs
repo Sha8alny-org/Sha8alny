@@ -65,5 +65,6 @@ namespace Sh8lny.Abstraction.Repositories
         
         Task<Student?> GetStudentWithSkillsAsync(int userId);
         Task<IEnumerable<SavedOpportunity>> GetSavedOpportunitiesWithProjectAsync(int studentId);
+        Task<List<Application>> GetApplicationsWithStudentDetailsAsync(int projectId);
     }
 }
