@@ -31,6 +31,13 @@ namespace Sh8lny.Domain.Models
         public string? MinAcademicYear { get; set; }
         public int? MaxApplicants { get; set; }
 
+        // GPA requirement
+        public bool IsGpaRequired { get; set; }
+        public decimal? MinimumGpa { get; set; }
+
+        // Duration
+        public DurationType? DurationType { get; set; }
+
         // Status
         public ProjectStatus Status { get; set; }
         public bool IsVisible { get; set; }
@@ -85,5 +92,14 @@ namespace Sh8lny.Domain.Models
         Complete,
         Cancelled,
         Closed
+    }
+
+    /// <summary>
+    /// Duration unit enumeration
+    /// </summary>
+    public enum DurationType
+    {
+        Days,
+        Hours
     }
 }

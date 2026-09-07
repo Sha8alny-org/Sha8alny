@@ -329,6 +329,9 @@ Conversation (1) ──→ (N) ConversationParticipant
 | `RequiredSkills`        | `string?`         | Legacy free-text field                   |
 | `MinAcademicYear`       | `string?`         |                                          |
 | `MaxApplicants`         | `int?`            |                                          |
+| `IsGpaRequired`         | `bool`            | Default `false`; GPA gate for training opportunities |
+| `MinimumGpa`            | `decimal?`        | Nullable; `decimal(3,2)` precision       |
+| `DurationType`          | `DurationType?`   | Enum: `Days`, `Hours` (stored as string) |
 | `Status`                | `ProjectStatus`   | Enum: `Draft`, `Active`, `Pending`, `Complete`, `Cancelled`, `Closed` (new projects are created as `Active`; EF default is `Draft`) |
 | `IsVisible`             | `bool`            | Visibility toggle                        |
 | `CreatedBy`             | `int`             | UserID of creator                        |
@@ -460,6 +463,8 @@ Conversation (1) ──→ (N) ConversationParticipant
 | `IsAdminApproved`     | `bool`                    | Admin academic approval                  |
 | `IsCompanyVerified`   | `bool`                    | Company industry verification            |
 | `TrainingDays`        | `int?`                    | Days to credit on full completion        |
+| `IsExternalTraining`  | `bool`                    | Default `false`; training done outside the platform |
+| `ApprovedDuration`    | `int?`                    | Admin-approved duration (unit per opportunity's `DurationType`), complements `TrainingDays` |
 | `AdminNotes`          | `string?`                 | Admin reviewer notes                     |
 | `RejectionReason`     | `string?`                 | Reason for rejection                     |
 | `ReviewedByAdminId`   | `int?` (FK → User)        | Admin who reviewed                       |
@@ -471,9 +476,25 @@ Conversation (1) ──→ (N) ConversationParticipant
 
 **TrainingSubmissionStatus enum:** `Pending`, `AdminApproved`, `CompanyVerified`, `FullyCompleted`, `Rejected`
 
-**Navigation:** `Application`, `Student`, `ReviewedByAdmin` (User)
+**Navigation:** `Application`, `Student`, `ReviewedByAdmin` (User), `SubmissionFiles`
 
 **Workflow:** Student submits documents → Admin reviews (approve/reject) → Company verifies → If both approved: Status = FullyCompleted, Student.TotalInternshipDays incremented
+
+#### `SubmissionFile` (Per-File Training Submission Attachment)
+| Property               | Type                    | Notes                                          |
+|------------------------|-------------------------|------------------------------------------------|
+| `SubmissionFileID`     | `int` (PK)              | Auto-increment                                 |
+| `TrainingSubmissionID` | `int` (FK → TrainingSubmission) | Parent submission                        |
+| `FileType`             | `SubmissionFileType`    | Enum: `Presentation`, `Report`, `StudentEvaluation`, `Certificate`, `Other` (stored as string) |
+| `FileUrl`              | `string`                | Required, max 500; URL from `/api/Media`       |
+| `Status`               | `SubmissionFileStatus`  | Enum: `Pending`, `Approved`, `Rejected` (stored as string, default `Pending`) |
+| `RejectionReason`      | `string?`               | Max 1000; reason when rejected                 |
+| `CreatedAt`            | `DateTime`              | Default `GETUTCDATE()`                         |
+| `UpdatedAt`            | `DateTime?`             | Set on re-upload/review                        |
+
+**Navigation:** `TrainingSubmission` (Restrict delete)
+
+**Purpose:** Per-file approval/rejection and re-upload on top of the legacy fixed URL columns (`CertificateUrl`, `ReportUrl`, etc.) on `TrainingSubmission`.
 
 #### `Announcement` (Platform-Wide Announcement)
 | Property      | Type        | Notes                                    |
@@ -1231,6 +1252,7 @@ Sh8lnySolution.sln
 │   │       ├── Student.cs
 │   │       ├── StudentReview.cs
 │   │       ├── StudentSkill.cs
+│   │       ├── SubmissionFile.cs
 │   │       ├── Transaction.cs
 │   │       ├── University.cs
 │   │       ├── User.cs

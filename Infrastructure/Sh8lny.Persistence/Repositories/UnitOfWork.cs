@@ -43,6 +43,7 @@ namespace Sh8lny.Persistence.Repositories
         private IGenericRepository<Transaction>? _transactions;
         private IGenericRepository<AppConfig>? _appConfigs;
         private IGenericRepository<TrainingSubmission>? _trainingSubmissions;
+        private IGenericRepository<SubmissionFile>? _submissionFiles;
         private IGenericRepository<Announcement>? _announcements;
 
         public UnitOfWork(Sha8lnyDbContext context)
@@ -144,6 +145,9 @@ namespace Sh8lny.Persistence.Repositories
 
         public IGenericRepository<TrainingSubmission> TrainingSubmissions =>
             _trainingSubmissions ??= new GenericRepository<TrainingSubmission>(_context);
+
+        public IGenericRepository<SubmissionFile> SubmissionFiles =>
+            _submissionFiles ??= new GenericRepository<SubmissionFile>(_context);
 
         public IGenericRepository<Announcement> Announcements =>
             _announcements ??= new GenericRepository<Announcement>(_context);

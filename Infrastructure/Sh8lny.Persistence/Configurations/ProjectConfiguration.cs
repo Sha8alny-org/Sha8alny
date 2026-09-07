@@ -43,6 +43,18 @@ namespace Sh8lny.Persistence.Configurations
             builder.Property(p => p.RequiredSkills)
                 .HasMaxLength(1000);
 
+            // GPA requirement
+            builder.Property(p => p.IsGpaRequired)
+                .HasDefaultValue(false);
+
+            builder.Property(p => p.MinimumGpa)
+                .HasColumnType("decimal(3,2)");
+
+            // Duration unit
+            builder.Property(p => p.DurationType)
+                .HasConversion<string>()
+                .HasMaxLength(20);
+
             builder.Property(p => p.CreatedByName)
                 .HasMaxLength(200);
 

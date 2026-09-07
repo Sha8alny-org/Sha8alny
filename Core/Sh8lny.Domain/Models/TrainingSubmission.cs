@@ -73,6 +73,17 @@ public class TrainingSubmission
     public int? TrainingDays { get; set; }
 
     /// <summary>
+    /// Whether the training was completed externally (outside the platform).
+    /// </summary>
+    public bool IsExternalTraining { get; set; }
+
+    /// <summary>
+    /// Duration (in days or hours, depending on the opportunity's DurationType)
+    /// approved by the admin, complementing TrainingDays.
+    /// </summary>
+    public int? ApprovedDuration { get; set; }
+
+    /// <summary>
     /// Notes from the admin reviewer.
     /// </summary>
     [MaxLength(1000)]
@@ -123,6 +134,11 @@ public class TrainingSubmission
 
     [ForeignKey(nameof(ReviewedByAdminId))]
     public virtual User? ReviewedByAdmin { get; set; }
+
+    /// <summary>
+    /// Individual files attached to this submission (per-file review and re-upload).
+    /// </summary>
+    public virtual ICollection<SubmissionFile> SubmissionFiles { get; set; } = new HashSet<SubmissionFile>();
 }
 
 /// <summary>

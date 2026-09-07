@@ -48,6 +48,7 @@ namespace Sh8lny.Abstraction.Repositories
 
         // Field Training
         IGenericRepository<TrainingSubmission> TrainingSubmissions { get; }
+        IGenericRepository<SubmissionFile> SubmissionFiles { get; }
 
         // Announcements
         IGenericRepository<Announcement> Announcements { get; }

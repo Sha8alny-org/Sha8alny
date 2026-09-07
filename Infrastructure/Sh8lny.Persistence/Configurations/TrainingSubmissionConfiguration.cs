@@ -46,6 +46,9 @@ public class TrainingSubmissionConfiguration : IEntityTypeConfiguration<Training
         builder.Property(ts => ts.UpdatedAt)
             .HasDefaultValueSql("GETUTCDATE()");
 
+        builder.Property(ts => ts.IsExternalTraining)
+            .HasDefaultValue(false);
+
         // Relationships
         builder.HasOne(ts => ts.Application)
             .WithMany()
@@ -61,6 +64,11 @@ public class TrainingSubmissionConfiguration : IEntityTypeConfiguration<Training
             .WithMany()
             .HasForeignKey(ts => ts.ReviewedByAdminId)
             .OnDelete(DeleteBehavior.SetNull);
+
+        builder.HasMany(ts => ts.SubmissionFiles)
+            .WithOne(sf => sf.TrainingSubmission)
+            .HasForeignKey(sf => sf.TrainingSubmissionID)
+            .OnDelete(DeleteBehavior.Restrict);
 
         // Indexes
         builder.HasIndex(ts => ts.ApplicationID);

@@ -68,6 +68,7 @@ namespace Sh8lny.Persistence.Contexts
 
         // Field Training
         public DbSet<TrainingSubmission> TrainingSubmissions { get; set; } = null!;
+        public DbSet<SubmissionFile> SubmissionFiles { get; set; } = null!;
 
         // Announcements
         public DbSet<Announcement> Announcements { get; set; } = null!;
