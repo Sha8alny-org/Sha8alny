@@ -180,6 +180,9 @@ public class ProjectsController : ControllerBase
     /// </remarks>
     [HttpGet("{projectId}/applicants/ranked-by-gpa")]
     [Authorize(Roles = "Company,Admin")]
+    [ProducesResponseType(typeof(ServiceResponse<IEnumerable<RankedApplicantDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ServiceResponse<IEnumerable<RankedApplicantDto>>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ServiceResponse<IEnumerable<RankedApplicantDto>>), StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<ServiceResponse<IEnumerable<RankedApplicantDto>>>> GetApplicantsRankedByGpa(
         int projectId, [FromQuery] int? count)
     {

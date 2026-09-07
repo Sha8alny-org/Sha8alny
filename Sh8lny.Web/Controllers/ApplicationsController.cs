@@ -24,11 +24,16 @@ public class ApplicationsController : ControllerBase
 
     /// <summary>
     /// Submits an application for a project.
+    /// Training/internship opportunities with a GPA requirement reject applicants
+    /// whose GPA is below the project's minimum.
     /// </summary>
     /// <param name="dto">The application data.</param>
     /// <returns>The created application ID.</returns>
     [HttpPost("apply")]
     [Authorize(Roles = "Student")]
+    [ProducesResponseType(typeof(ServiceResponse<int>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ServiceResponse<int>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ServiceResponse<int>), StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<ServiceResponse<int>>> Apply([FromBody] CreateApplicationDto dto)
     {
         var userId = GetCurrentUserId();

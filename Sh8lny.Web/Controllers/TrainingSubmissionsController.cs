@@ -56,6 +56,8 @@ public class TrainingSubmissionsController : ControllerBase
     /// <param name="id">The submission ID.</param>
     /// <returns>The training submission details.</returns>
     [HttpGet("{id}")]
+    [ProducesResponseType(typeof(ServiceResponse<TrainingSubmissionDetailDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ServiceResponse<TrainingSubmissionDetailDto>), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<ServiceResponse<TrainingSubmissionDetailDto>>> GetById(int id)
     {
         var result = await _trainingSubmissionService.GetSubmissionDetailAsync(id);
@@ -77,6 +79,9 @@ public class TrainingSubmissionsController : ControllerBase
     /// <returns>The created submission with the per-file breakdown.</returns>
     [HttpPost("deliverables")]
     [Authorize(Roles = "Student")]
+    [ProducesResponseType(typeof(ServiceResponse<TrainingSubmissionDetailDto>), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ServiceResponse<TrainingSubmissionDetailDto>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ServiceResponse<TrainingSubmissionDetailDto>), StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<ServiceResponse<TrainingSubmissionDetailDto>>> SubmitDeliverables(
         [FromBody] SubmitTrainingDeliverablesDto dto)
     {
@@ -105,6 +110,9 @@ public class TrainingSubmissionsController : ControllerBase
     /// <returns>The updated submission with the per-file breakdown.</returns>
     [HttpPost("{id}/review")]
     [Authorize(Roles = "Admin")]
+    [ProducesResponseType(typeof(ServiceResponse<TrainingSubmissionDetailDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ServiceResponse<TrainingSubmissionDetailDto>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ServiceResponse<TrainingSubmissionDetailDto>), StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<ServiceResponse<TrainingSubmissionDetailDto>>> ReviewDeliverables(
         int id, [FromBody] ReviewTrainingDeliverablesDto dto)
     {
@@ -133,6 +141,9 @@ public class TrainingSubmissionsController : ControllerBase
     /// <returns>The updated submission with the per-file breakdown.</returns>
     [HttpPut("{id}/reupload")]
     [Authorize(Roles = "Student")]
+    [ProducesResponseType(typeof(ServiceResponse<TrainingSubmissionDetailDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ServiceResponse<TrainingSubmissionDetailDto>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ServiceResponse<TrainingSubmissionDetailDto>), StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<ServiceResponse<TrainingSubmissionDetailDto>>> ReuploadDeliverable(
         int id, [FromBody] ReuploadSingleDeliverableDto dto)
     {
@@ -264,6 +275,9 @@ public class TrainingSubmissionsController : ControllerBase
     /// </remarks>
     [HttpGet("records/filter")]
     [Authorize(Roles = "Admin")]
+    [ProducesResponseType(typeof(ServiceResponse<PagedResult<TrainingRecordListItemDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ServiceResponse<PagedResult<TrainingRecordListItemDto>>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ServiceResponse<PagedResult<TrainingRecordListItemDto>>), StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<ServiceResponse<PagedResult<TrainingRecordListItemDto>>>> GetFilteredTrainingRecords(
         [FromQuery] TrainingRecordFilterDto filter)
     {
@@ -293,6 +307,9 @@ public class TrainingSubmissionsController : ControllerBase
     /// <returns>The updated submission with the per-file breakdown.</returns>
     [HttpPut("{id}/override-duration")]
     [Authorize(Roles = "Admin")]
+    [ProducesResponseType(typeof(ServiceResponse<TrainingSubmissionDetailDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ServiceResponse<TrainingSubmissionDetailDto>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ServiceResponse<TrainingSubmissionDetailDto>), StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<ServiceResponse<TrainingSubmissionDetailDto>>> OverrideDuration(
         int id, [FromBody] OverrideTrainingDurationDto dto)
     {
