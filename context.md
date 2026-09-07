@@ -483,6 +483,8 @@ Conversation (1) ──→ (N) ConversationParticipant
 
 **Per-File Deliverables Workflow (on `SubmissionFiles`):** Student submits the 5 deliverables via `/api/TrainingSubmissions/deliverables` (5 `SubmissionFile` rows created as `Pending`, legacy URL columns kept in sync) → Admin reviews each file via `/{id}/review` (rejection requires a reason) → All approved ⇒ `IsAdminApproved = true`, overall `AdminApproved`; any rejected ⇒ overall `Rejected` with per-file reasons → Student re-uploads only rejected files via `/{id}/reupload` (file reset to `Pending`, overall back to `Pending`, legacy URL column updated, approved files untouched).
 
+**Duration Crediting (6-hour standard training day):** Hours convert to days via `Ceiling(hours / 6.0)`. At final completion (`CheckAndFinalizeAsync` when both approvals are in place), the credited days prioritize `ApprovedDuration` (admin override via `/{id}/override-duration`, range 1–365) → `TrainingDays` (declared) → equivalent days parsed from the project listing (first number in `Project.Duration` combined with `Project.DurationType`). `TrainingDays` is set to the effective value, `Student.TotalInternshipDays` is incremented once (guarded against double-credit), and the Application is marked `Completed` (plus the Project `Complete` when no other non-terminal applications remain).
+
 #### `SubmissionFile` (Per-File Training Submission Attachment)
 | Property               | Type                    | Notes                                          |
 |------------------------|-------------------------|------------------------------------------------|
@@ -896,6 +898,7 @@ Searches across Students (by name), Companies (by name), and all Users (by email
 | `/api/TrainingSubmissions/deliverables`           | POST   | Student        | Submit the 5 training deliverables (per-file records created in `Pending` state) |
 | `/api/TrainingSubmissions/{id}/review`            | POST   | Admin          | Per-file review of deliverables (approve/reject each with reason; all-approved → `IsAdminApproved`, any-rejected → overall `Rejected`) |
 | `/api/TrainingSubmissions/{id}/reupload`          | PUT    | Student        | Re-upload a single rejected deliverable (resets that file to `Pending`, overall back to `Pending`; approved files untouched) |
+| `/api/TrainingSubmissions/{id}/override-duration` | PUT    | Admin          | Override the final approved training duration in days (1–365, with optional justification; takes priority when crediting days at completion) |
 
 **Dual-Approval Workflow:**
 1. Student submits training documents → Status = `Pending`

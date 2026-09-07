@@ -120,4 +120,16 @@ public interface ITrainingSubmissionService
     /// <param name="submissionId">The submission ID.</param>
     /// <returns>Service response with the submission detail.</returns>
     Task<ServiceResponse<TrainingSubmissionDetailDto>> GetSubmissionDetailAsync(int submissionId);
+
+    /// <summary>
+    /// Training Unit admin overrides the final approved training duration (in days).
+    /// Used when the actual certificate proves a duration different from the
+    /// project's original listing. The override takes priority when crediting days
+    /// at completion.
+    /// </summary>
+    /// <param name="adminUserId">The admin's user ID (from JWT claims).</param>
+    /// <param name="submissionId">The submission ID.</param>
+    /// <param name="dto">The approved duration (days) and optional justification.</param>
+    /// <returns>Service response with the updated submission detail.</returns>
+    Task<ServiceResponse<TrainingSubmissionDetailDto>> OverrideDurationAsync(int adminUserId, int submissionId, OverrideTrainingDurationDto dto);
 }

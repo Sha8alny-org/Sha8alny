@@ -284,6 +284,35 @@ public class TrainingSubmissionsController : ControllerBase
     }
 
     /// <summary>
+    /// Training Unit admin overrides the final approved training duration (in days).
+    /// Used when the actual certificate proves a duration different from the
+    /// project's original listing. The override takes priority when crediting days.
+    /// </summary>
+    /// <param name="id">The submission ID.</param>
+    /// <param name="dto">The approved duration (days) and optional justification.</param>
+    /// <returns>The updated submission with the per-file breakdown.</returns>
+    [HttpPut("{id}/override-duration")]
+    [Authorize(Roles = "Admin")]
+    public async Task<ActionResult<ServiceResponse<TrainingSubmissionDetailDto>>> OverrideDuration(
+        int id, [FromBody] OverrideTrainingDurationDto dto)
+    {
+        var userId = GetCurrentUserId();
+        if (userId == null)
+        {
+            return Unauthorized(ServiceResponse<TrainingSubmissionDetailDto>.Failure("User not authenticated."));
+        }
+
+        var result = await _trainingSubmissionService.OverrideDurationAsync(userId.Value, id, dto);
+
+        if (!result.IsSuccess)
+        {
+            return BadRequest(result);
+        }
+
+        return Ok(result);
+    }
+
+    /// <summary>
     /// Gets the current user's ID from JWT claims.
     /// </summary>
     private int? GetCurrentUserId()

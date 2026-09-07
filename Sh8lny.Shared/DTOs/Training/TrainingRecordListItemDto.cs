@@ -31,4 +31,24 @@ public class TrainingRecordListItemDto
     public string SubmissionStatus { get; set; } = string.Empty;
     public int? TrainingDays { get; set; }
     public int? ApprovedDuration { get; set; }
+
+    // ── Duration info ──────────────────────────────────────
+
+    /// <summary>
+    /// Duration unit of the training opportunity ("Days" or "Hours").
+    /// </summary>
+    public string? DurationType { get; set; }
+
+    /// <summary>
+    /// Equivalent days calculated from the project listing
+    /// (hours converted at a 6-hour standard training day).
+    /// </summary>
+    public int? CalculatedDays { get; set; }
+
+    /// <summary>
+    /// The final effective credited days:
+    /// admin-approved override first, then declared training days,
+    /// then the calculated equivalent days from the project listing.
+    /// </summary>
+    public int? CreditedDays { get; set; }
 }

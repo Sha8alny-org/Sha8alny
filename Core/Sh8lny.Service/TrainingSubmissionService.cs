@@ -399,8 +399,9 @@ public class TrainingSubmissionService : ITrainingSubmissionService
                 dto.ApplicationId, student.StudentID, submission.TrainingSubmissionID);
 
             var files = await GetSubmissionFilesAsync(submission.TrainingSubmissionID);
+            var project = await _unitOfWork.Projects.GetByIdAsync(application.ProjectID);
             return ServiceResponse<TrainingSubmissionDetailDto>.Success(
-                MapToDetailDto(submission, files, student.FullName),
+                MapToDetailDto(submission, files, student.FullName, project),
                 "Training deliverables submitted successfully.");
         }
         catch (Exception ex)
@@ -523,8 +524,9 @@ public class TrainingSubmissionService : ITrainingSubmissionService
                 submissionId, adminUserId, submission.Status);
 
             var student = await _unitOfWork.Students.GetByIdAsync(submission.StudentID);
+            var reviewedProject = await GetProjectForSubmissionAsync(submission);
             return ServiceResponse<TrainingSubmissionDetailDto>.Success(
-                MapToDetailDto(submission, files, student?.FullName),
+                MapToDetailDto(submission, files, student?.FullName, reviewedProject),
                 "Training deliverables reviewed successfully.");
         }
         catch (Exception ex)
@@ -608,8 +610,9 @@ public class TrainingSubmissionService : ITrainingSubmissionService
                 "Deliverable {FileType} of submission {SubmissionId} re-uploaded by student {StudentId}",
                 fileType, submissionId, student.StudentID);
 
+            var reuploadProject = await GetProjectForSubmissionAsync(submission);
             return ServiceResponse<TrainingSubmissionDetailDto>.Success(
-                MapToDetailDto(submission, files, student.FullName),
+                MapToDetailDto(submission, files, student.FullName, reuploadProject),
                 $"'{fileType}' deliverable re-uploaded successfully. The submission is awaiting admin review again.");
         }
         catch (Exception ex)
@@ -632,9 +635,10 @@ public class TrainingSubmissionService : ITrainingSubmissionService
 
             var files = await GetSubmissionFilesAsync(submissionId);
             var student = await _unitOfWork.Students.GetByIdAsync(submission.StudentID);
+            var project = await GetProjectForSubmissionAsync(submission);
 
             return ServiceResponse<TrainingSubmissionDetailDto>.Success(
-                MapToDetailDto(submission, files, student?.FullName));
+                MapToDetailDto(submission, files, student?.FullName, project));
         }
         catch (Exception ex)
         {
@@ -643,31 +647,118 @@ public class TrainingSubmissionService : ITrainingSubmissionService
         }
     }
 
+    /// <inheritdoc />
+    public async Task<ServiceResponse<TrainingSubmissionDetailDto>> OverrideDurationAsync(int adminUserId, int submissionId, OverrideTrainingDurationDto dto)
+    {
+        try
+        {
+            // 1. Admin-only role check
+            var admin = await _unitOfWork.Users.GetByIdAsync(adminUserId);
+            if (admin is null)
+            {
+                return ServiceResponse<TrainingSubmissionDetailDto>.Failure("User not found.");
+            }
+
+            if (admin.UserType != UserType.Admin)
+            {
+                return ServiceResponse<TrainingSubmissionDetailDto>.Failure("Only administrators can override the training duration.");
+            }
+
+            // 2. Load submission and validate it is still open for updates
+            var submission = await _unitOfWork.TrainingSubmissions.GetByIdAsync(submissionId);
+            if (submission is null)
+            {
+                return ServiceResponse<TrainingSubmissionDetailDto>.Failure("Training submission not found.");
+            }
+
+            if (submission.Status == TrainingSubmissionStatus.FullyCompleted)
+            {
+                return ServiceResponse<TrainingSubmissionDetailDto>.Failure(
+                    "Cannot override the duration of a fully completed submission.");
+            }
+
+            // 3. Apply the override
+            submission.ApprovedDuration = dto.ApprovedDuration;
+
+            if (!string.IsNullOrWhiteSpace(dto.AdminNotes))
+            {
+                submission.AdminNotes = string.IsNullOrWhiteSpace(submission.AdminNotes)
+                    ? dto.AdminNotes.Trim()
+                    : $"{submission.AdminNotes} | {dto.AdminNotes.Trim()}";
+            }
+
+            submission.UpdatedAt = DateTime.UtcNow;
+
+            _unitOfWork.TrainingSubmissions.Update(submission);
+            await _unitOfWork.SaveAsync();
+
+            _logger.LogInformation(
+                "Training duration for submission {SubmissionId} overridden to {ApprovedDuration} days by admin {AdminId}",
+                submissionId, dto.ApprovedDuration, adminUserId);
+
+            var files = await GetSubmissionFilesAsync(submissionId);
+            var student = await _unitOfWork.Students.GetByIdAsync(submission.StudentID);
+            var project = await GetProjectForSubmissionAsync(submission);
+
+            return ServiceResponse<TrainingSubmissionDetailDto>.Success(
+                MapToDetailDto(submission, files, student?.FullName, project),
+                $"Approved duration set to {dto.ApprovedDuration} days.");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error overriding training duration for submission {SubmissionId}", submissionId);
+            return ServiceResponse<TrainingSubmissionDetailDto>.Failure("An error occurred while overriding the training duration.");
+        }
+    }
+
     /// <summary>
     /// Checks if a submission can be fully completed (both admin approved and company verified).
-    /// If so, updates the status and increments the student's TotalInternshipDays.
+    /// If so, updates the status, credits the effective training days to the student's
+    /// TotalInternshipDays balance, and reflects completion on the application/project.
     /// </summary>
     private async Task CheckAndFinalizeAsync(TrainingSubmission submission)
     {
         if (submission.IsAdminApproved && submission.IsCompanyVerified)
         {
+            // Guard against double-crediting (e.g. a second admin review after completion)
+            if (submission.Status == TrainingSubmissionStatus.FullyCompleted)
+            {
+                return;
+            }
+
             submission.Status = TrainingSubmissionStatus.FullyCompleted;
             submission.CompletedAt = DateTime.UtcNow;
 
-            // Increment student's TotalInternshipDays if TrainingDays is specified
-            if (submission.TrainingDays.HasValue && submission.TrainingDays.Value > 0)
+            // Effective credited days priority:
+            // 1. Admin-approved override (ApprovedDuration)
+            // 2. Declared training days (TrainingDays)
+            // 3. Equivalent days calculated from the project listing (hours at a 6-hour training day)
+            int? effectiveDays = submission.ApprovedDuration ?? submission.TrainingDays;
+            if (!effectiveDays.HasValue)
             {
+                var project = await GetProjectForSubmissionAsync(submission);
+                effectiveDays = TryGetProjectDurationDays(project);
+            }
+
+            if (effectiveDays.HasValue && effectiveDays.Value > 0)
+            {
+                submission.TrainingDays = effectiveDays.Value;
+
                 var student = await _unitOfWork.Students.GetByIdAsync(submission.StudentID);
                 if (student != null)
                 {
-                    student.TotalInternshipDays += submission.TrainingDays.Value;
+                    student.TotalInternshipDays += effectiveDays.Value;
                     student.UpdatedAt = DateTime.UtcNow;
                     _unitOfWork.Students.Update(student);
 
-                    _logger.LogInformation("Added {TrainingDays} days to student {StudentId}. New total: {TotalDays}", 
-                        submission.TrainingDays.Value, student.StudentID, student.TotalInternshipDays);
+                    _logger.LogInformation("Added {TrainingDays} days to student {StudentId}. New total: {TotalDays}",
+                        effectiveDays.Value, student.StudentID, student.TotalInternshipDays);
                 }
             }
+
+            // Reflect completion on the application (and the project when no other
+            // active applications remain)
+            await MarkApplicationCompletedAsync(submission);
         }
         else if (submission.IsAdminApproved)
         {
@@ -676,6 +767,44 @@ public class TrainingSubmissionService : ITrainingSubmissionService
         else if (submission.IsCompanyVerified)
         {
             submission.Status = TrainingSubmissionStatus.CompanyVerified;
+        }
+    }
+
+    /// <summary>
+    /// Marks the application of a fully completed training submission as Completed,
+    /// and completes the project when no other non-terminal applications remain.
+    /// </summary>
+    private async Task MarkApplicationCompletedAsync(TrainingSubmission submission)
+    {
+        var application = await _unitOfWork.Applications.GetByIdAsync(submission.ApplicationID);
+        if (application == null)
+        {
+            return;
+        }
+
+        if (application.Status != ApplicationStatus.Completed)
+        {
+            application.Status = ApplicationStatus.Completed;
+            application.CompletedAt = DateTime.UtcNow;
+            _unitOfWork.Applications.Update(application);
+        }
+
+        var otherActiveApplications = await _unitOfWork.Applications.FindAsync(a =>
+            a.ProjectID == application.ProjectID &&
+            a.ApplicationID != application.ApplicationID &&
+            a.Status != ApplicationStatus.Completed &&
+            a.Status != ApplicationStatus.Rejected &&
+            a.Status != ApplicationStatus.Withdrawn);
+
+        if (!otherActiveApplications.Any())
+        {
+            var project = await _unitOfWork.Projects.GetByIdAsync(application.ProjectID);
+            if (project != null && project.Status != ProjectStatus.Complete)
+            {
+                project.Status = ProjectStatus.Complete;
+                project.UpdatedAt = DateTime.UtcNow;
+                _unitOfWork.Projects.Update(project);
+            }
         }
     }
 
@@ -717,6 +846,7 @@ public class TrainingSubmissionService : ITrainingSubmissionService
     {
         var student = submission.Student;
         var project = submission.Application?.Project;
+        var calculatedDays = TryGetProjectDurationDays(project);
 
         return new TrainingRecordListItemDto
         {
@@ -737,11 +867,14 @@ public class TrainingSubmissionService : ITrainingSubmissionService
             StartDate = project?.StartDate,
             EndDate = project?.EndDate,
             Duration = project?.Duration,
+            DurationType = project?.DurationType?.ToString(),
 
             // Submission & status info
             SubmissionStatus = submission.Status.ToString(),
             TrainingDays = submission.TrainingDays,
-            ApprovedDuration = submission.ApprovedDuration
+            ApprovedDuration = submission.ApprovedDuration,
+            CalculatedDays = calculatedDays,
+            CreditedDays = submission.ApprovedDuration ?? submission.TrainingDays ?? calculatedDays
         };
     }
 
@@ -766,6 +899,71 @@ public class TrainingSubmissionService : ITrainingSubmissionService
         fileType = SubmissionFileType.Other;
         return Enum.TryParse(deliverableType, ignoreCase: true, out fileType)
             && DeliverableTypes.Contains(fileType);
+    }
+
+    /// <summary>
+    /// Calculates the equivalent training days for a duration value.
+    /// Hours are converted at the 6-hour standard training day (ceiling);
+    /// days are used as-is.
+    /// </summary>
+    /// <param name="durationValue">The duration value from the project listing.</param>
+    /// <param name="type">The duration unit (Days or Hours).</param>
+    /// <returns>The equivalent number of training days.</returns>
+    private static int CalculateEquivalentDays(int durationValue, DurationType type)
+    {
+        return type == DurationType.Hours
+            ? (int)Math.Ceiling(durationValue / 6.0)
+            : durationValue;
+    }
+
+    /// <summary>
+    /// Derives the equivalent training days from the project listing, using the first
+    /// number found in the free-text Duration field and the project's DurationType
+    /// (e.g. "2 hours daily for 15 days" with DurationType.Hours → parses "2" → 1 day).
+    /// Returns null when the project or its duration cannot be parsed.
+    /// </summary>
+    private static int? TryGetProjectDurationDays(Project? project)
+    {
+        if (project is null)
+        {
+            return null;
+        }
+
+        var durationValue = ParseLeadingDurationValue(project.Duration);
+        if (!durationValue.HasValue)
+        {
+            return null;
+        }
+
+        return CalculateEquivalentDays(durationValue.Value, project.DurationType ?? DurationType.Days);
+    }
+
+    /// <summary>
+    /// Extracts the first integer from a free-text duration string (e.g. "30 hours" → 30).
+    /// </summary>
+    private static int? ParseLeadingDurationValue(string? duration)
+    {
+        if (string.IsNullOrWhiteSpace(duration))
+        {
+            return null;
+        }
+
+        var match = System.Text.RegularExpressions.Regex.Match(duration, @"\d+");
+        return match.Success && int.TryParse(match.Value, out var value) ? value : null;
+    }
+
+    /// <summary>
+    /// Gets the project associated with a training submission (via its application).
+    /// </summary>
+    private async Task<Project?> GetProjectForSubmissionAsync(TrainingSubmission submission)
+    {
+        var application = await _unitOfWork.Applications.GetByIdAsync(submission.ApplicationID);
+        if (application is null)
+        {
+            return null;
+        }
+
+        return await _unitOfWork.Projects.GetByIdAsync(application.ProjectID);
     }
 
     /// <summary>
@@ -807,8 +1005,10 @@ public class TrainingSubmissionService : ITrainingSubmissionService
     /// Maps a TrainingSubmission with its per-file records to a TrainingSubmissionDetailDto.
     /// </summary>
     private static TrainingSubmissionDetailDto MapToDetailDto(
-        TrainingSubmission submission, List<SubmissionFile> files, string? studentName = null)
+        TrainingSubmission submission, List<SubmissionFile> files, string? studentName = null, Project? project = null)
     {
+        var calculatedDays = TryGetProjectDurationDays(project);
+
         return new TrainingSubmissionDetailDto
         {
             TrainingSubmissionID = submission.TrainingSubmissionID,
@@ -826,6 +1026,9 @@ public class TrainingSubmissionService : ITrainingSubmissionService
             TrainingDays = submission.TrainingDays,
             ApprovedDuration = submission.ApprovedDuration,
             IsExternalTraining = submission.IsExternalTraining,
+            DurationType = project?.DurationType?.ToString(),
+            CalculatedDays = calculatedDays,
+            CreditedDays = submission.ApprovedDuration ?? submission.TrainingDays ?? calculatedDays,
             AdminNotes = submission.AdminNotes,
             RejectionReason = submission.RejectionReason,
             ReviewedByAdminId = submission.ReviewedByAdminId,
