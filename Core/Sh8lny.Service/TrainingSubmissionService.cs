@@ -322,6 +322,327 @@ public class TrainingSubmissionService : ITrainingSubmissionService
         }
     }
 
+    /// <inheritdoc />
+    public async Task<ServiceResponse<TrainingSubmissionDetailDto>> SubmitDeliverablesAsync(int studentUserId, SubmitTrainingDeliverablesDto dto)
+    {
+        try
+        {
+            // 1. Resolve student profile
+            var student = await _unitOfWork.Students.FindSingleAsync(s => s.UserID == studentUserId);
+            if (student is null)
+            {
+                return ServiceResponse<TrainingSubmissionDetailDto>.Failure("Student profile not found. Please create your profile first.");
+            }
+
+            // 2. Validate application exists and belongs to the student
+            var application = await _unitOfWork.Applications.GetByIdAsync(dto.ApplicationId);
+            if (application is null)
+            {
+                return ServiceResponse<TrainingSubmissionDetailDto>.Failure("Application not found.");
+            }
+
+            if (application.StudentID != student.StudentID)
+            {
+                return ServiceResponse<TrainingSubmissionDetailDto>.Failure("You can only submit training deliverables for your own applications.");
+            }
+
+            // 3. Application must be in an eligible state (accepted or in training)
+            if (application.Status != ApplicationStatus.Accepted && application.Status != ApplicationStatus.InProgress)
+            {
+                return ServiceResponse<TrainingSubmissionDetailDto>.Failure(
+                    "Training deliverables can only be submitted for accepted or in-progress applications.");
+            }
+
+            // 4. Prevent duplicate submissions for the same application
+            var existingSubmission = await _unitOfWork.TrainingSubmissions
+                .FindSingleAsync(ts => ts.ApplicationID == dto.ApplicationId);
+            if (existingSubmission is not null)
+            {
+                return ServiceResponse<TrainingSubmissionDetailDto>.Failure(
+                    "Training deliverables have already been submitted for this application. Use the re-upload endpoint to update rejected files.");
+            }
+
+            // 5. Create the submission (legacy URL columns kept in sync)
+            var submission = new TrainingSubmission
+            {
+                ApplicationID = dto.ApplicationId,
+                StudentID = student.StudentID,
+                CertificateUrl = dto.CertificateUrl,
+                ReportUrl = dto.ReportUrl,
+                PresentationUrl = dto.PresentationUrl,
+                CompanyEvaluationUrl = dto.CompanyEvaluationUrl,
+                StudentSurveyUrl = dto.StudentSurveyUrl,
+                TrainingDays = dto.TrainingDays,
+                Status = TrainingSubmissionStatus.Pending,
+                SubmittedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+
+            await _unitOfWork.TrainingSubmissions.AddAsync(submission);
+            await _unitOfWork.SaveAsync();
+
+            // 6. Create the per-file deliverable records
+            var deliverables = new List<SubmissionFile>
+            {
+                new() { TrainingSubmissionID = submission.TrainingSubmissionID, FileType = SubmissionFileType.Certificate, FileUrl = dto.CertificateUrl, Status = SubmissionFileStatus.Pending, CreatedAt = DateTime.UtcNow },
+                new() { TrainingSubmissionID = submission.TrainingSubmissionID, FileType = SubmissionFileType.Report, FileUrl = dto.ReportUrl, Status = SubmissionFileStatus.Pending, CreatedAt = DateTime.UtcNow },
+                new() { TrainingSubmissionID = submission.TrainingSubmissionID, FileType = SubmissionFileType.Presentation, FileUrl = dto.PresentationUrl, Status = SubmissionFileStatus.Pending, CreatedAt = DateTime.UtcNow },
+                new() { TrainingSubmissionID = submission.TrainingSubmissionID, FileType = SubmissionFileType.CompanyEvaluation, FileUrl = dto.CompanyEvaluationUrl, Status = SubmissionFileStatus.Pending, CreatedAt = DateTime.UtcNow },
+                new() { TrainingSubmissionID = submission.TrainingSubmissionID, FileType = SubmissionFileType.StudentSurvey, FileUrl = dto.StudentSurveyUrl, Status = SubmissionFileStatus.Pending, CreatedAt = DateTime.UtcNow }
+            };
+
+            await _unitOfWork.SubmissionFiles.AddRangeAsync(deliverables);
+            await _unitOfWork.SaveAsync();
+
+            _logger.LogInformation(
+                "Training deliverables submitted for application {ApplicationId} by student {StudentId} (submission {SubmissionId})",
+                dto.ApplicationId, student.StudentID, submission.TrainingSubmissionID);
+
+            var files = await GetSubmissionFilesAsync(submission.TrainingSubmissionID);
+            return ServiceResponse<TrainingSubmissionDetailDto>.Success(
+                MapToDetailDto(submission, files, student.FullName),
+                "Training deliverables submitted successfully.");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error submitting training deliverables for application {ApplicationId}", dto.ApplicationId);
+            return ServiceResponse<TrainingSubmissionDetailDto>.Failure("An error occurred while submitting the training deliverables.");
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task<ServiceResponse<TrainingSubmissionDetailDto>> ReviewDeliverablesAsync(int submissionId, int adminUserId, ReviewTrainingDeliverablesDto dto)
+    {
+        try
+        {
+            // 1. Admin-only role check
+            var admin = await _unitOfWork.Users.GetByIdAsync(adminUserId);
+            if (admin is null)
+            {
+                return ServiceResponse<TrainingSubmissionDetailDto>.Failure("User not found.");
+            }
+
+            if (admin.UserType != UserType.Admin)
+            {
+                return ServiceResponse<TrainingSubmissionDetailDto>.Failure("Only administrators can review training deliverables.");
+            }
+
+            // 2. Load submission
+            var submission = await _unitOfWork.TrainingSubmissions.GetByIdAsync(submissionId);
+            if (submission is null)
+            {
+                return ServiceResponse<TrainingSubmissionDetailDto>.Failure("Training submission not found.");
+            }
+
+            if (submission.Status == TrainingSubmissionStatus.FullyCompleted)
+            {
+                return ServiceResponse<TrainingSubmissionDetailDto>.Failure("Cannot review a fully completed submission.");
+            }
+
+            // 3. Load per-file records
+            var files = await GetSubmissionFilesAsync(submissionId);
+            if (files.Count == 0)
+            {
+                return ServiceResponse<TrainingSubmissionDetailDto>.Failure("No deliverable files found for this submission.");
+            }
+
+            // 4. Apply per-file decisions
+            foreach (var decision in dto.Decisions)
+            {
+                if (!TryParseDeliverableType(decision.DeliverableType, out var fileType))
+                {
+                    return ServiceResponse<TrainingSubmissionDetailDto>.Failure(
+                        $"Invalid deliverable type '{decision.DeliverableType}'. Valid values: Certificate, Report, Presentation, CompanyEvaluation, StudentSurvey.");
+                }
+
+                var file = files.FirstOrDefault(f => f.FileType == fileType);
+                if (file is null)
+                {
+                    return ServiceResponse<TrainingSubmissionDetailDto>.Failure(
+                        $"No '{decision.DeliverableType}' deliverable found for this submission.");
+                }
+
+                var statusText = decision.Status?.Trim();
+
+                if (string.Equals(statusText, "Approved", StringComparison.OrdinalIgnoreCase))
+                {
+                    file.Status = SubmissionFileStatus.Approved;
+                    file.RejectionReason = null;
+                }
+                else if (string.Equals(statusText, "Rejected", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (string.IsNullOrWhiteSpace(decision.RejectionReason))
+                    {
+                        return ServiceResponse<TrainingSubmissionDetailDto>.Failure(
+                            $"A rejection reason is required when rejecting the '{decision.DeliverableType}' deliverable.");
+                    }
+
+                    file.Status = SubmissionFileStatus.Rejected;
+                    file.RejectionReason = decision.RejectionReason.Trim();
+                }
+                else
+                {
+                    return ServiceResponse<TrainingSubmissionDetailDto>.Failure(
+                        $"Invalid review status '{decision.Status}'. Use 'Approved' or 'Rejected'.");
+                }
+
+                file.UpdatedAt = DateTime.UtcNow;
+                _unitOfWork.SubmissionFiles.Update(file);
+            }
+
+            // 5. Evaluate the overall submission status
+            submission.AdminNotes = dto.AdminNotes;
+            submission.ReviewedByAdminId = adminUserId;
+            submission.AdminReviewedAt = DateTime.UtcNow;
+            submission.UpdatedAt = DateTime.UtcNow;
+
+            if (files.All(f => f.Status == SubmissionFileStatus.Approved))
+            {
+                submission.IsAdminApproved = true;
+                submission.RejectionReason = null;
+                submission.Status = TrainingSubmissionStatus.AdminApproved;
+                await CheckAndFinalizeAsync(submission);
+            }
+            else
+            {
+                submission.IsAdminApproved = false;
+                submission.Status = TrainingSubmissionStatus.Rejected;
+
+                var reasons = files
+                    .Where(f => f.Status == SubmissionFileStatus.Rejected && !string.IsNullOrWhiteSpace(f.RejectionReason))
+                    .Select(f => $"{f.FileType}: {f.RejectionReason}");
+                var joinedReasons = string.Join(" | ", reasons);
+                submission.RejectionReason = joinedReasons.Length > 1000 ? joinedReasons[..1000] : joinedReasons;
+            }
+
+            _unitOfWork.TrainingSubmissions.Update(submission);
+            await _unitOfWork.SaveAsync();
+
+            _logger.LogInformation(
+                "Training deliverables for submission {SubmissionId} reviewed by admin {AdminId}. Overall status: {Status}",
+                submissionId, adminUserId, submission.Status);
+
+            var student = await _unitOfWork.Students.GetByIdAsync(submission.StudentID);
+            return ServiceResponse<TrainingSubmissionDetailDto>.Success(
+                MapToDetailDto(submission, files, student?.FullName),
+                "Training deliverables reviewed successfully.");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error reviewing training deliverables for submission {SubmissionId}", submissionId);
+            return ServiceResponse<TrainingSubmissionDetailDto>.Failure("An error occurred while reviewing the training deliverables.");
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task<ServiceResponse<TrainingSubmissionDetailDto>> ReuploadDeliverableAsync(int studentUserId, int submissionId, ReuploadSingleDeliverableDto dto)
+    {
+        try
+        {
+            // 1. Resolve student profile
+            var student = await _unitOfWork.Students.FindSingleAsync(s => s.UserID == studentUserId);
+            if (student is null)
+            {
+                return ServiceResponse<TrainingSubmissionDetailDto>.Failure("Student profile not found.");
+            }
+
+            // 2. Load submission and validate ownership
+            var submission = await _unitOfWork.TrainingSubmissions.GetByIdAsync(submissionId);
+            if (submission is null)
+            {
+                return ServiceResponse<TrainingSubmissionDetailDto>.Failure("Training submission not found.");
+            }
+
+            if (submission.StudentID != student.StudentID)
+            {
+                return ServiceResponse<TrainingSubmissionDetailDto>.Failure("You can only re-upload deliverables for your own submissions.");
+            }
+
+            // 3. Parse and validate the deliverable type
+            if (!TryParseDeliverableType(dto.DeliverableType, out var fileType))
+            {
+                return ServiceResponse<TrainingSubmissionDetailDto>.Failure(
+                    $"Invalid deliverable type '{dto.DeliverableType}'. Valid values: Certificate, Report, Presentation, CompanyEvaluation, StudentSurvey.");
+            }
+
+            // 4. Find the target file
+            var files = await GetSubmissionFilesAsync(submissionId);
+            var file = files.FirstOrDefault(f => f.FileType == fileType);
+            if (file is null)
+            {
+                return ServiceResponse<TrainingSubmissionDetailDto>.Failure(
+                    $"No '{dto.DeliverableType}' deliverable found for this submission.");
+            }
+
+            // 5. Only rejected deliverables can be re-uploaded
+            if (file.Status != SubmissionFileStatus.Rejected)
+            {
+                return ServiceResponse<TrainingSubmissionDetailDto>.Failure(
+                    $"Only rejected deliverables can be re-uploaded. The '{dto.DeliverableType}' deliverable is currently '{file.Status}'.");
+            }
+
+            // 6. Update only this file — approved files are untouched
+            file.FileUrl = dto.NewUrl;
+            file.Status = SubmissionFileStatus.Pending;
+            file.RejectionReason = null;
+            file.UpdatedAt = DateTime.UtcNow;
+            _unitOfWork.SubmissionFiles.Update(file);
+
+            // Keep the legacy URL column in sync
+            ApplyLegacyUrl(submission, fileType, dto.NewUrl);
+
+            // 7. Return the overall submission to pending admin review
+            if (submission.Status == TrainingSubmissionStatus.Rejected)
+            {
+                submission.Status = TrainingSubmissionStatus.Pending;
+            }
+
+            submission.IsAdminApproved = false;
+            submission.RejectionReason = null;
+            submission.UpdatedAt = DateTime.UtcNow;
+
+            _unitOfWork.TrainingSubmissions.Update(submission);
+            await _unitOfWork.SaveAsync();
+
+            _logger.LogInformation(
+                "Deliverable {FileType} of submission {SubmissionId} re-uploaded by student {StudentId}",
+                fileType, submissionId, student.StudentID);
+
+            return ServiceResponse<TrainingSubmissionDetailDto>.Success(
+                MapToDetailDto(submission, files, student.FullName),
+                $"'{fileType}' deliverable re-uploaded successfully. The submission is awaiting admin review again.");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error re-uploading deliverable for submission {SubmissionId}", submissionId);
+            return ServiceResponse<TrainingSubmissionDetailDto>.Failure("An error occurred while re-uploading the deliverable.");
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task<ServiceResponse<TrainingSubmissionDetailDto>> GetSubmissionDetailAsync(int submissionId)
+    {
+        try
+        {
+            var submission = await _unitOfWork.TrainingSubmissions.GetByIdAsync(submissionId);
+            if (submission is null)
+            {
+                return ServiceResponse<TrainingSubmissionDetailDto>.Failure("Training submission not found.");
+            }
+
+            var files = await GetSubmissionFilesAsync(submissionId);
+            var student = await _unitOfWork.Students.GetByIdAsync(submission.StudentID);
+
+            return ServiceResponse<TrainingSubmissionDetailDto>.Success(
+                MapToDetailDto(submission, files, student?.FullName));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving training submission detail {SubmissionId}", submissionId);
+            return ServiceResponse<TrainingSubmissionDetailDto>.Failure("An error occurred while retrieving the submission detail.");
+        }
+    }
+
     /// <summary>
     /// Checks if a submission can be fully completed (both admin approved and company verified).
     /// If so, updates the status and increments the student's TotalInternshipDays.
@@ -421,6 +742,106 @@ public class TrainingSubmissionService : ITrainingSubmissionService
             SubmissionStatus = submission.Status.ToString(),
             TrainingDays = submission.TrainingDays,
             ApprovedDuration = submission.ApprovedDuration
+        };
+    }
+
+    /// <summary>
+    /// The deliverable types supported by the per-file review workflow.
+    /// </summary>
+    private static readonly HashSet<SubmissionFileType> DeliverableTypes = new()
+    {
+        SubmissionFileType.Certificate,
+        SubmissionFileType.Report,
+        SubmissionFileType.Presentation,
+        SubmissionFileType.CompanyEvaluation,
+        SubmissionFileType.StudentSurvey
+    };
+
+    /// <summary>
+    /// Attempts to parse a deliverable type string (e.g. "Certificate") into a
+    /// <see cref="SubmissionFileType"/> used by the per-file review workflow.
+    /// </summary>
+    private static bool TryParseDeliverableType(string? deliverableType, out SubmissionFileType fileType)
+    {
+        fileType = SubmissionFileType.Other;
+        return Enum.TryParse(deliverableType, ignoreCase: true, out fileType)
+            && DeliverableTypes.Contains(fileType);
+    }
+
+    /// <summary>
+    /// Gets the per-file deliverable records for a submission.
+    /// </summary>
+    private async Task<List<SubmissionFile>> GetSubmissionFilesAsync(int submissionId)
+    {
+        var files = await _unitOfWork.SubmissionFiles
+            .FindAsync(sf => sf.TrainingSubmissionID == submissionId);
+        return files.ToList();
+    }
+
+    /// <summary>
+    /// Keeps the legacy URL column on TrainingSubmission in sync with a re-uploaded file.
+    /// </summary>
+    private static void ApplyLegacyUrl(TrainingSubmission submission, SubmissionFileType fileType, string url)
+    {
+        switch (fileType)
+        {
+            case SubmissionFileType.Certificate:
+                submission.CertificateUrl = url;
+                break;
+            case SubmissionFileType.Report:
+                submission.ReportUrl = url;
+                break;
+            case SubmissionFileType.Presentation:
+                submission.PresentationUrl = url;
+                break;
+            case SubmissionFileType.CompanyEvaluation:
+                submission.CompanyEvaluationUrl = url;
+                break;
+            case SubmissionFileType.StudentSurvey:
+                submission.StudentSurveyUrl = url;
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Maps a TrainingSubmission with its per-file records to a TrainingSubmissionDetailDto.
+    /// </summary>
+    private static TrainingSubmissionDetailDto MapToDetailDto(
+        TrainingSubmission submission, List<SubmissionFile> files, string? studentName = null)
+    {
+        return new TrainingSubmissionDetailDto
+        {
+            TrainingSubmissionID = submission.TrainingSubmissionID,
+            ApplicationID = submission.ApplicationID,
+            StudentID = submission.StudentID,
+            StudentName = studentName,
+            CertificateUrl = submission.CertificateUrl,
+            ReportUrl = submission.ReportUrl,
+            PresentationUrl = submission.PresentationUrl,
+            CompanyEvaluationUrl = submission.CompanyEvaluationUrl,
+            StudentSurveyUrl = submission.StudentSurveyUrl,
+            Status = submission.Status.ToString(),
+            IsAdminApproved = submission.IsAdminApproved,
+            IsCompanyVerified = submission.IsCompanyVerified,
+            TrainingDays = submission.TrainingDays,
+            ApprovedDuration = submission.ApprovedDuration,
+            IsExternalTraining = submission.IsExternalTraining,
+            AdminNotes = submission.AdminNotes,
+            RejectionReason = submission.RejectionReason,
+            ReviewedByAdminId = submission.ReviewedByAdminId,
+            AdminReviewedAt = submission.AdminReviewedAt,
+            CompanyVerifiedAt = submission.CompanyVerifiedAt,
+            CompletedAt = submission.CompletedAt,
+            SubmittedAt = submission.SubmittedAt,
+            UpdatedAt = submission.UpdatedAt,
+            Files = files.Select(f => new TrainingDeliverableFileDto
+            {
+                FileType = f.FileType.ToString(),
+                FileUrl = f.FileUrl,
+                Status = f.Status.ToString(),
+                RejectionReason = f.RejectionReason,
+                UpdatedAt = f.UpdatedAt
+            }).ToList()
         };
     }
 }

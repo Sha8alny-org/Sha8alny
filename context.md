@@ -481,12 +481,14 @@ Conversation (1) ──→ (N) ConversationParticipant
 
 **Workflow:** Student submits documents → Admin reviews (approve/reject) → Company verifies → If both approved: Status = FullyCompleted, Student.TotalInternshipDays incremented
 
+**Per-File Deliverables Workflow (on `SubmissionFiles`):** Student submits the 5 deliverables via `/api/TrainingSubmissions/deliverables` (5 `SubmissionFile` rows created as `Pending`, legacy URL columns kept in sync) → Admin reviews each file via `/{id}/review` (rejection requires a reason) → All approved ⇒ `IsAdminApproved = true`, overall `AdminApproved`; any rejected ⇒ overall `Rejected` with per-file reasons → Student re-uploads only rejected files via `/{id}/reupload` (file reset to `Pending`, overall back to `Pending`, legacy URL column updated, approved files untouched).
+
 #### `SubmissionFile` (Per-File Training Submission Attachment)
 | Property               | Type                    | Notes                                          |
 |------------------------|-------------------------|------------------------------------------------|
 | `SubmissionFileID`     | `int` (PK)              | Auto-increment                                 |
 | `TrainingSubmissionID` | `int` (FK → TrainingSubmission) | Parent submission                        |
-| `FileType`             | `SubmissionFileType`    | Enum: `Presentation`, `Report`, `StudentEvaluation`, `Certificate`, `Other` (stored as string) |
+| `FileType`             | `SubmissionFileType`    | Enum: `Presentation`, `Report`, `StudentEvaluation`, `Certificate`, `Other`, `CompanyEvaluation`, `StudentSurvey` (stored as string) |
 | `FileUrl`              | `string`                | Required, max 500; URL from `/api/Media`       |
 | `Status`               | `SubmissionFileStatus`  | Enum: `Pending`, `Approved`, `Rejected` (stored as string, default `Pending`) |
 | `RejectionReason`      | `string?`               | Max 1000; reason when rejected                 |
@@ -891,6 +893,9 @@ Searches across Students (by name), Companies (by name), and all Users (by email
 | `/api/TrainingSubmissions/pending-admin`          | GET    | Admin/University | Admin review queue                            |
 | `/api/TrainingSubmissions/pending-company`        | GET    | Company        | Company verify queue                           |
 | `/api/TrainingSubmissions/records/filter`         | GET    | Admin          | Advanced search over training records (Company, date range, Department, AcademicYear, ProjectType filters + pagination) |
+| `/api/TrainingSubmissions/deliverables`           | POST   | Student        | Submit the 5 training deliverables (per-file records created in `Pending` state) |
+| `/api/TrainingSubmissions/{id}/review`            | POST   | Admin          | Per-file review of deliverables (approve/reject each with reason; all-approved → `IsAdminApproved`, any-rejected → overall `Rejected`) |
+| `/api/TrainingSubmissions/{id}/reupload`          | PUT    | Student        | Re-upload a single rejected deliverable (resets that file to `Pending`, overall back to `Pending`; approved files untouched) |
 
 **Dual-Approval Workflow:**
 1. Student submits training documents → Status = `Pending`

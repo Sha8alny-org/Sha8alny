@@ -80,4 +80,44 @@ public interface ITrainingSubmissionService
     /// <param name="filter">The filter criteria and pagination parameters.</param>
     /// <returns>Service response with the paged training records.</returns>
     Task<ServiceResponse<PagedResult<TrainingRecordListItemDto>>> GetFilteredTrainingRecordsAsync(int userId, TrainingRecordFilterDto filter);
+
+    /// <summary>
+    /// Submits the 5 training deliverables (Certificate, Report, Presentation,
+    /// CompanyEvaluation, StudentSurvey) for an application, creating per-file
+    /// records that the Training Unit can review individually.
+    /// </summary>
+    /// <param name="studentUserId">The student's user ID (from JWT claims).</param>
+    /// <param name="dto">The deliverable document URLs.</param>
+    /// <returns>Service response with the created submission detail.</returns>
+    Task<ServiceResponse<TrainingSubmissionDetailDto>> SubmitDeliverablesAsync(int studentUserId, SubmitTrainingDeliverablesDto dto);
+
+    /// <summary>
+    /// Training Unit admin reviews the deliverables of a submission, approving or
+    /// rejecting each file with an optional rejection reason. If all files are
+    /// approved the submission is academically approved; if any file is rejected
+    /// the submission is marked Rejected and the student may re-upload that file.
+    /// </summary>
+    /// <param name="submissionId">The submission ID to review.</param>
+    /// <param name="adminUserId">The admin's user ID (from JWT claims).</param>
+    /// <param name="dto">The per-file review decisions.</param>
+    /// <returns>Service response with the updated submission detail.</returns>
+    Task<ServiceResponse<TrainingSubmissionDetailDto>> ReviewDeliverablesAsync(int submissionId, int adminUserId, ReviewTrainingDeliverablesDto dto);
+
+    /// <summary>
+    /// Student re-uploads a single rejected deliverable. Updates only that file's
+    /// URL, resets its status to Pending, clears its rejection reason, and returns
+    /// the overall submission to Pending review. Approved files are untouched.
+    /// </summary>
+    /// <param name="studentUserId">The student's user ID (from JWT claims).</param>
+    /// <param name="submissionId">The submission ID.</param>
+    /// <param name="dto">The deliverable type and new URL.</param>
+    /// <returns>Service response with the updated submission detail.</returns>
+    Task<ServiceResponse<TrainingSubmissionDetailDto>> ReuploadDeliverableAsync(int studentUserId, int submissionId, ReuploadSingleDeliverableDto dto);
+
+    /// <summary>
+    /// Gets a training submission with the per-file deliverable breakdown.
+    /// </summary>
+    /// <param name="submissionId">The submission ID.</param>
+    /// <returns>Service response with the submission detail.</returns>
+    Task<ServiceResponse<TrainingSubmissionDetailDto>> GetSubmissionDetailAsync(int submissionId);
 }

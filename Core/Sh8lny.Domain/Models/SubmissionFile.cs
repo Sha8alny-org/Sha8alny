@@ -83,7 +83,17 @@ public enum SubmissionFileType
     /// <summary>
     /// Any other document type.
     /// </summary>
-    Other = 4
+    Other = 4,
+
+    /// <summary>
+    /// Company evaluation form.
+    /// </summary>
+    CompanyEvaluation = 5,
+
+    /// <summary>
+    /// Student field training survey.
+    /// </summary>
+    StudentSurvey = 6
 }
 
 /// <summary>

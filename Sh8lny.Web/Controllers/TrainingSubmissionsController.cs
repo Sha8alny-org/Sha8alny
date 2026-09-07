@@ -51,18 +51,102 @@ public class TrainingSubmissionsController : ControllerBase
     }
 
     /// <summary>
-    /// Gets a training submission by its ID.
+    /// Gets a training submission by its ID, including the per-file deliverable breakdown.
     /// </summary>
     /// <param name="id">The submission ID.</param>
     /// <returns>The training submission details.</returns>
     [HttpGet("{id}")]
-    public async Task<ActionResult<ServiceResponse<TrainingSubmissionResponseDto>>> GetById(int id)
+    public async Task<ActionResult<ServiceResponse<TrainingSubmissionDetailDto>>> GetById(int id)
     {
-        var result = await _trainingSubmissionService.GetByIdAsync(id);
-        
+        var result = await _trainingSubmissionService.GetSubmissionDetailAsync(id);
+
         if (!result.IsSuccess)
         {
             return NotFound(result);
+        }
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Submits the 5 training deliverables (Certificate, Report, Presentation,
+    /// CompanyEvaluation, StudentSurvey) for an application.
+    /// All document URLs should be obtained from /api/Media upload endpoints.
+    /// </summary>
+    /// <param name="dto">The deliverable document URLs.</param>
+    /// <returns>The created submission with the per-file breakdown.</returns>
+    [HttpPost("deliverables")]
+    [Authorize(Roles = "Student")]
+    public async Task<ActionResult<ServiceResponse<TrainingSubmissionDetailDto>>> SubmitDeliverables(
+        [FromBody] SubmitTrainingDeliverablesDto dto)
+    {
+        var userId = GetCurrentUserId();
+        if (userId == null)
+        {
+            return Unauthorized(ServiceResponse<TrainingSubmissionDetailDto>.Failure("User not authenticated."));
+        }
+
+        var result = await _trainingSubmissionService.SubmitDeliverablesAsync(userId.Value, dto);
+
+        if (!result.IsSuccess)
+        {
+            return BadRequest(result);
+        }
+
+        return CreatedAtAction(nameof(GetById), new { id = result.Data!.TrainingSubmissionID }, result);
+    }
+
+    /// <summary>
+    /// Training Unit admin reviews the deliverables of a submission, approving or
+    /// rejecting each file. A rejection reason is required for rejected files.
+    /// </summary>
+    /// <param name="id">The submission ID to review.</param>
+    /// <param name="dto">The per-file review decisions.</param>
+    /// <returns>The updated submission with the per-file breakdown.</returns>
+    [HttpPost("{id}/review")]
+    [Authorize(Roles = "Admin")]
+    public async Task<ActionResult<ServiceResponse<TrainingSubmissionDetailDto>>> ReviewDeliverables(
+        int id, [FromBody] ReviewTrainingDeliverablesDto dto)
+    {
+        var userId = GetCurrentUserId();
+        if (userId == null)
+        {
+            return Unauthorized(ServiceResponse<TrainingSubmissionDetailDto>.Failure("User not authenticated."));
+        }
+
+        var result = await _trainingSubmissionService.ReviewDeliverablesAsync(id, userId.Value, dto);
+
+        if (!result.IsSuccess)
+        {
+            return BadRequest(result);
+        }
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Re-uploads a single rejected deliverable. Only the rejected file is updated;
+    /// approved documents are preserved.
+    /// </summary>
+    /// <param name="id">The submission ID.</param>
+    /// <param name="dto">The deliverable type and the new URL (from /api/Media).</param>
+    /// <returns>The updated submission with the per-file breakdown.</returns>
+    [HttpPut("{id}/reupload")]
+    [Authorize(Roles = "Student")]
+    public async Task<ActionResult<ServiceResponse<TrainingSubmissionDetailDto>>> ReuploadDeliverable(
+        int id, [FromBody] ReuploadSingleDeliverableDto dto)
+    {
+        var userId = GetCurrentUserId();
+        if (userId == null)
+        {
+            return Unauthorized(ServiceResponse<TrainingSubmissionDetailDto>.Failure("User not authenticated."));
+        }
+
+        var result = await _trainingSubmissionService.ReuploadDeliverableAsync(userId.Value, id, dto);
+
+        if (!result.IsSuccess)
+        {
+            return BadRequest(result);
         }
 
         return Ok(result);
