@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Sh8lny.Abstraction.Services;
 using Sh8lny.Shared.DTOs.Common;
+using Sh8lny.Shared.DTOs.Training;
 using Sh8lny.Shared.DTOs.TrainingSubmission;
 
 namespace Sh8lny.Web.Controllers;
@@ -163,6 +164,38 @@ public class TrainingSubmissionsController : ControllerBase
         }
 
         var result = await _trainingSubmissionService.GetPendingForCompanyAsync(companyId.Value);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Advanced search over student training/internship records (Training Unit, Admin only).
+    /// </summary>
+    /// <param name="filter">
+    /// Query params: CompanyId, StartDate, EndDate, DepartmentId (null = all departments),
+    /// AcademicYear, ProjectType ("Training"/"Internship"), PageNumber, PageSize.
+    /// </param>
+    /// <returns>Paginated list of matching training records.</returns>
+    /// <remarks>
+    /// Example: GET /api/TrainingSubmissions/records/filter?StartDate=2020-01-01&amp;EndDate=2024-12-31&amp;DepartmentId=3&amp;PageNumber=1&amp;PageSize=10
+    /// </remarks>
+    [HttpGet("records/filter")]
+    [Authorize(Roles = "Admin")]
+    public async Task<ActionResult<ServiceResponse<PagedResult<TrainingRecordListItemDto>>>> GetFilteredTrainingRecords(
+        [FromQuery] TrainingRecordFilterDto filter)
+    {
+        var userId = GetCurrentUserId();
+        if (userId == null)
+        {
+            return Unauthorized(ServiceResponse<PagedResult<TrainingRecordListItemDto>>.Failure("User not authenticated."));
+        }
+
+        var result = await _trainingSubmissionService.GetFilteredTrainingRecordsAsync(userId.Value, filter);
+
+        if (!result.IsSuccess)
+        {
+            return BadRequest(result);
+        }
+
         return Ok(result);
     }
 

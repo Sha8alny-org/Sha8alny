@@ -1,4 +1,5 @@
 using Sh8lny.Domain.Models;
+using Sh8lny.Shared.DTOs.Training;
 
 namespace Sh8lny.Abstraction.Repositories
 {
@@ -66,5 +67,13 @@ namespace Sh8lny.Abstraction.Repositories
         Task<Student?> GetStudentWithSkillsAsync(int userId);
         Task<IEnumerable<SavedOpportunity>> GetSavedOpportunitiesWithProjectAsync(int studentId);
         Task<List<Application>> GetApplicationsWithStudentDetailsAsync(int projectId);
+
+        /// <summary>
+        /// Gets a filtered, paged page of training/internship records
+        /// (TrainingSubmissions with student, department, university, project, and company details).
+        /// </summary>
+        /// <param name="filter">The filter criteria and pagination parameters.</param>
+        /// <returns>The page of training submissions plus the total matching count.</returns>
+        Task<(List<TrainingSubmission> Items, int TotalCount)> GetFilteredTrainingRecordsAsync(TrainingRecordFilterDto filter);
     }
 }

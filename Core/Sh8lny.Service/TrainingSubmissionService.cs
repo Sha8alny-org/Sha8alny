@@ -3,6 +3,7 @@ using Sh8lny.Abstraction.Repositories;
 using Sh8lny.Abstraction.Services;
 using Sh8lny.Domain.Models;
 using Sh8lny.Shared.DTOs.Common;
+using Sh8lny.Shared.DTOs.Training;
 using Sh8lny.Shared.DTOs.TrainingSubmission;
 
 namespace Sh8lny.Service;
@@ -280,6 +281,47 @@ public class TrainingSubmissionService : ITrainingSubmissionService
         }
     }
 
+    /// <inheritdoc />
+    public async Task<ServiceResponse<PagedResult<TrainingRecordListItemDto>>> GetFilteredTrainingRecordsAsync(int userId, TrainingRecordFilterDto filter)
+    {
+        try
+        {
+            // Admin-only access (Training Unit)
+            var user = await _unitOfWork.Users.GetByIdAsync(userId);
+            if (user is null)
+            {
+                return ServiceResponse<PagedResult<TrainingRecordListItemDto>>.Failure("User not found.");
+            }
+
+            if (user.UserType != UserType.Admin)
+            {
+                return ServiceResponse<PagedResult<TrainingRecordListItemDto>>.Failure(
+                    "Only administrators can access training records.");
+            }
+
+            filter.Normalize();
+
+            var (items, totalCount) = await _unitOfWork.GetFilteredTrainingRecordsAsync(filter);
+
+            var dtos = items.Select(MapToListItemDto).ToList();
+            var pagedResult = PagedResult<TrainingRecordListItemDto>.Create(
+                dtos, filter.PageNumber, filter.PageSize, totalCount);
+
+            _logger.LogInformation(
+                "Retrieved {Count} training records (page {PageNumber} of {TotalPages}) for admin {UserId}",
+                dtos.Count, filter.PageNumber, pagedResult.TotalPages, userId);
+
+            return ServiceResponse<PagedResult<TrainingRecordListItemDto>>.Success(
+                pagedResult, "Training records retrieved successfully.");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving filtered training records for admin {UserId}", userId);
+            return ServiceResponse<PagedResult<TrainingRecordListItemDto>>.Failure(
+                "An error occurred while retrieving training records.");
+        }
+    }
+
     /// <summary>
     /// Checks if a submission can be fully completed (both admin approved and company verified).
     /// If so, updates the status and increments the student's TotalInternshipDays.
@@ -343,6 +385,42 @@ public class TrainingSubmissionService : ITrainingSubmissionService
             CompletedAt = submission.CompletedAt,
             SubmittedAt = submission.SubmittedAt,
             UpdatedAt = submission.UpdatedAt
+        };
+    }
+
+    /// <summary>
+    /// Maps a TrainingSubmission (with loaded Student, Department, University, Application, Project, Company)
+    /// to a TrainingRecordListItemDto.
+    /// </summary>
+    private static TrainingRecordListItemDto MapToListItemDto(TrainingSubmission submission)
+    {
+        var student = submission.Student;
+        var project = submission.Application?.Project;
+
+        return new TrainingRecordListItemDto
+        {
+            // Student details
+            StudentId = student?.StudentID ?? 0,
+            StudentName = student?.FullName ?? "Unknown",
+            AcademicYear = student?.AcademicYear?.ToString(),
+            DepartmentName = student?.Department?.DepartmentName,
+            UniversityName = student?.University?.UniversityName,
+            Gpa = student?.Gpa,
+
+            // Training details
+            ProjectId = project?.ProjectID ?? 0,
+            ProjectTitle = project?.ProjectName,
+            CompanyId = project?.CompanyID ?? 0,
+            CompanyName = project?.Company?.CompanyName,
+            ProjectType = project?.ProjectType?.ToString(),
+            StartDate = project?.StartDate,
+            EndDate = project?.EndDate,
+            Duration = project?.Duration,
+
+            // Submission & status info
+            SubmissionStatus = submission.Status.ToString(),
+            TrainingDays = submission.TrainingDays,
+            ApprovedDuration = submission.ApprovedDuration
         };
     }
 }

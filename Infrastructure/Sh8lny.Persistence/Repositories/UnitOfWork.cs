@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore.Storage;
 using Sh8lny.Abstraction.Repositories;
 using Sh8lny.Domain.Models;
 using Sh8lny.Persistence.Contexts;
+using Sh8lny.Shared.DTOs.Training;
 
 namespace Sh8lny.Persistence.Repositories
 {
@@ -217,6 +218,70 @@ namespace Sh8lny.Persistence.Repositories
                     .ThenInclude(s => s.Department)
                 .Where(a => a.ProjectID == projectId)
                 .ToListAsync();
+        }
+
+        public async Task<(List<TrainingSubmission> Items, int TotalCount)> GetFilteredTrainingRecordsAsync(TrainingRecordFilterDto filter)
+        {
+            var query = _context.TrainingSubmissions
+                .Include(ts => ts.Application)
+                    .ThenInclude(a => a.Project)
+                        .ThenInclude(p => p.Company)
+                .Include(ts => ts.Student)
+                    .ThenInclude(s => s.Department)
+                .Include(ts => ts.Student)
+                    .ThenInclude(s => s.University)
+                .AsQueryable();
+
+            // Only training/internship opportunities
+            query = query.Where(ts =>
+                ts.Application.Project.ProjectType == ProjectType.Training ||
+                ts.Application.Project.ProjectType == ProjectType.Internship);
+
+            // Company filter
+            if (filter.CompanyId.HasValue)
+            {
+                query = query.Where(ts => ts.Application.Project.CompanyID == filter.CompanyId.Value);
+            }
+
+            // Date range filters (matched against Project.StartDate / Project.EndDate)
+            if (filter.StartDate.HasValue)
+            {
+                query = query.Where(ts => ts.Application.Project.StartDate >= filter.StartDate.Value);
+            }
+
+            if (filter.EndDate.HasValue)
+            {
+                query = query.Where(ts => ts.Application.Project.EndDate <= filter.EndDate.Value);
+            }
+
+            // Department filter (null = all departments)
+            if (filter.DepartmentId.HasValue)
+            {
+                query = query.Where(ts => ts.Student.DepartmentID == filter.DepartmentId.Value);
+            }
+
+            // Academic year filter (int? mapped to the AcademicYear enum)
+            if (filter.AcademicYear.HasValue)
+            {
+                query = query.Where(ts => ts.Student.AcademicYear == (AcademicYear?)filter.AcademicYear.Value);
+            }
+
+            // Project type filter (Training vs Internship)
+            if (!string.IsNullOrWhiteSpace(filter.ProjectType) &&
+                Enum.TryParse<ProjectType>(filter.ProjectType, ignoreCase: true, out var projectType))
+            {
+                query = query.Where(ts => ts.Application.Project.ProjectType == projectType);
+            }
+
+            var totalCount = await query.CountAsync();
+
+            var items = await query
+                .OrderByDescending(ts => ts.SubmittedAt)
+                .Skip((filter.PageNumber - 1) * filter.PageSize)
+                .Take(filter.PageSize)
+                .ToListAsync();
+
+            return (items, totalCount);
         }
 
         protected virtual void Dispose(bool disposing)

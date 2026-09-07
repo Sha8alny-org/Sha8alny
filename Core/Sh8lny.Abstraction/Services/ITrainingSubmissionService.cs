@@ -1,4 +1,5 @@
 using Sh8lny.Shared.DTOs.Common;
+using Sh8lny.Shared.DTOs.Training;
 using Sh8lny.Shared.DTOs.TrainingSubmission;
 
 namespace Sh8lny.Abstraction.Services;
@@ -70,4 +71,13 @@ public interface ITrainingSubmissionService
     /// <param name="companyId">The company ID.</param>
     /// <returns>Service response with list of submissions pending company verification.</returns>
     Task<ServiceResponse<IEnumerable<TrainingSubmissionResponseDto>>> GetPendingForCompanyAsync(int companyId);
+
+    /// <summary>
+    /// Gets a filtered, paginated list of student training/internship records.
+    /// Admin-only (Training Unit).
+    /// </summary>
+    /// <param name="userId">The requesting user ID (from JWT claims).</param>
+    /// <param name="filter">The filter criteria and pagination parameters.</param>
+    /// <returns>Service response with the paged training records.</returns>
+    Task<ServiceResponse<PagedResult<TrainingRecordListItemDto>>> GetFilteredTrainingRecordsAsync(int userId, TrainingRecordFilterDto filter);
 }

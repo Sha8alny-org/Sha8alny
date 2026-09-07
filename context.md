@@ -890,6 +890,7 @@ Searches across Students (by name), Companies (by name), and all Users (by email
 | `/api/TrainingSubmissions/{id}/company-verify`    | PUT    | Company        | Company industry verification                  |
 | `/api/TrainingSubmissions/pending-admin`          | GET    | Admin/University | Admin review queue                            |
 | `/api/TrainingSubmissions/pending-company`        | GET    | Company        | Company verify queue                           |
+| `/api/TrainingSubmissions/records/filter`         | GET    | Admin          | Advanced search over training records (Company, date range, Department, AcademicYear, ProjectType filters + pagination) |
 
 **Dual-Approval Workflow:**
 1. Student submits training documents → Status = `Pending`
